@@ -11,7 +11,6 @@ import {
   permutationInverse,
   permutationLabel,
   permutationText,
-  transformationOrder,
   type AffineKey,
   type Permutation,
 } from "./math/engine";
@@ -19,6 +18,7 @@ import { CipherWheel } from "./components/CipherWheel";
 import { GroupCipherCards } from "./components/GroupCipherCards";
 import { LabCalculations } from "./components/LabCalculations";
 import { CommonAlgebraicStructure } from "./components/CommonAlgebraicStructure";
+import { ExperimentsLab } from "./components/ExperimentsLab";
 import "./App.css";
 
 type Page =
@@ -178,7 +178,7 @@ function App() {
               />
             )}
             {page === "structure" && <CommonAlgebraicStructure />}
-            {page === "security" && <Security />}
+            {page === "security" && <ExperimentsLab />}
             {page === "team" && <Team />}
             {page === "research" && <Research />}
           </motion.div>
@@ -787,10 +787,10 @@ function Groups({
           <div className="inverse-equation">
             a⁻¹ = 21
             <br />
-            b′ = −21 × 8 mod 26 = 12
+            b′ = −21 × 8 mod 26 = 14
           </div>
           <strong>
-            E<sub>(21, 12)</sub>
+            E<sub>(21, 14)</sub>
           </strong>
           <small>Because 5 × 21 mod 26 = 1</small>
         </div>
@@ -837,104 +837,7 @@ function Groups({
   );
 }
 
-function Security() {
-  const [cipher, setCipher] = useState("KHOOR ZRUOG");
-  const [selected, setSelected] = useState(3);
-  const guesses = Array.from({ length: 7 }, (_, index) => ({
-    key: index,
-    text: caesarText(cipher, -index),
-  }));
-  const order = transformationOrder((value) => (value + 3) % 26, 26);
-  return (
-    <div className="page-wrap">
-      <PageIntro
-        eyebrow="04 / SECURITY EXPERIMENTS"
-        title={
-          <>
-            Measure the
-            <br />
-            <em>small systems.</em>
-          </>
-        }
-      >
-        <p>
-          These are reproducible educational demonstrations, not security
-          claims. Classical ciphers should never protect sensitive modern
-          communications.
-        </p>
-      </PageIntro>
-      <section className="experiment-grid">
-        <div className="panel brute-force">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">EXPERIMENT A / ENUMERATION</p>
-              <h2>Brute-force a shift</h2>
-            </div>
-            <span className="result-badge">26 KEYS</span>
-          </div>
-          <input
-            className="experiment-input"
-            value={cipher}
-            onChange={(event) => setCipher(event.target.value)}
-            aria-label="Ciphertext to brute force"
-          />
-          {guesses.map((guess) => (
-            <button
-              className={selected === guess.key ? "guess selected" : "guess"}
-              key={guess.key}
-              onClick={() => setSelected(guess.key)}
-            >
-              <span>k = {guess.key}</span>
-              <strong>{guess.text}</strong>
-              <i>↗</i>
-            </button>
-          ))}
-        </div>
-        <div className="panel observations">
-          <p className="eyebrow">OBSERVATION LOG</p>
-          <div className="observation">
-            <span>01</span>
-            <p>
-              <b>Enumeration is finite.</b> A key space of 26 is easy to search
-              exhaustively.
-            </p>
-          </div>
-          <div className="observation">
-            <span>02</span>
-            <p>
-              <b>Structure explains the cycle.</b> Shift 3 has order {order};
-              repeated application returns to identity.
-            </p>
-          </div>
-          <div className="observation">
-            <span>03</span>
-            <p>
-              <b>Key space is not security.</b> This classroom-sized system is
-              deliberately transparent.
-            </p>
-          </div>
-          <div className="frequency">
-            <span>LETTER FREQUENCY / SAMPLE</span>
-            <div>
-              {[
-                ["E", 92],
-                ["T", 72],
-                ["A", 64],
-                ["O", 58],
-                ["I", 51],
-              ].map(([letter, width]) => (
-                <div key={letter}>
-                  <b>{letter}</b>
-                  <i style={{ width: `${width}%` }} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
+
 type TeamMember = {
   id: string;
   name: string;

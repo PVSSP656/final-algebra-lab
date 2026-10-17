@@ -57,6 +57,12 @@ export function affineText(text: string, key: AffineKey, decrypt = false): strin
   }).join('')
 }
 
+/**
+ * Composes two affine transformations: computes (first o second)(x) = first(second(x)).
+ * Here, `second` is applied first (inner), and `first` is applied second (outer).
+ * Formula: a_comp = (first.a * second.a) mod 26
+ *          b_comp = (first.a * second.b + first.b) mod 26
+ */
 export function affineCompose(first: AffineKey, second: AffineKey): AffineKey {
   return { a: mod(first.a * second.a), b: mod(first.a * second.b + first.b) }
 }
@@ -70,6 +76,10 @@ export function permutationApply(permutation: Permutation, block: string): strin
   return permutation.map((index) => block[index] ?? '').join('')
 }
 
+/**
+ * Composes two permutations: computes (first o second)(x) = first(second(x)).
+ * Here, `second` is applied first (inner), and `first` is applied second (outer).
+ */
 export function permutationCompose(first: Permutation, second: Permutation): Permutation {
   return first.map((index) => second[index]) as Permutation
 }
@@ -277,5 +287,56 @@ export function getPermutationTrace(permutation: Permutation, text: string, decr
     blocks,
     leftoverLetters,
     fullOutput,
+  }
+}
+
+export type LetterFrequency = {
+  letter: string
+  count: number
+  percentage: number
+}
+
+export type FrequencyAnalysisResult = {
+  totalAlphabetic: number
+  frequencies: LetterFrequency[]
+  maxPercentage: number
+  maxCount: number
+}
+
+/**
+ * Computes exact counts and percentages for all A-Z characters in text.
+ * Excludes spaces, punctuation, digits, and non-ASCII characters.
+ * Percentage formula: f(c) = (count(c) / totalAlphabetic) * 100%.
+ */
+export function computeLetterFrequencies(text: string): FrequencyAnalysisResult {
+  const counts = new Map<string, number>()
+  for (const char of ALPHABET) {
+    counts.set(char, 0)
+  }
+  let totalAlphabetic = 0
+  for (const char of text.toUpperCase()) {
+    if (counts.has(char)) {
+      counts.set(char, (counts.get(char) ?? 0) + 1)
+      totalAlphabetic += 1
+    }
+  }
+  let maxPercentage = 0
+  let maxCount = 0
+  const frequencies: LetterFrequency[] = ALPHABET.split('').map((letter) => {
+    const count = counts.get(letter) ?? 0
+    if (count > maxCount) maxCount = count
+    const percentage = totalAlphabetic > 0 ? (count / totalAlphabetic) * 100 : 0
+    if (percentage > maxPercentage) maxPercentage = percentage
+    return {
+      letter,
+      count,
+      percentage: Number(percentage.toFixed(2)),
+    }
+  })
+  return {
+    totalAlphabetic,
+    frequencies,
+    maxPercentage,
+    maxCount,
   }
 }
