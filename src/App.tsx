@@ -785,51 +785,66 @@ function Groups({
             <sup>−1</sup>
           </h3>
           <div className="inverse-equation">
-            a⁻¹ = 21
-            <br />
-            b′ = −21 × 8 mod 26 = 14
+            <span>a⁻¹ = 21</span>
+            <span>b′ = −a⁻¹b mod 26 = −21 × 8 mod 26 = −168 mod 26 = 14</span>
           </div>
-          <strong>
+          <strong className="inverse-result">
             E<sub>(21, 14)</sub>
           </strong>
-          <small>Because 5 × 21 mod 26 = 1</small>
+          <small>Verification: (5 × 21) mod 26 = 105 mod 26 = 1</small>
         </div>
         <div className="panel affine-compose">
           <p className="eyebrow">AFFINE COMPOSITION</p>
           <div className="affine-compose-row">
-            <span>
-              E<sub>(5,8)</sub> ∘ E
+            <span className="compose-prefix">
+              E<sub>(5, 8)</sub> ∘ E
             </span>
-            <input
-              type="number"
-              value={compareAffine.a}
-              onChange={(event) =>
-                setCompareAffine({
-                  ...compareAffine,
-                  a: Number(event.target.value),
-                })
-              }
-            />
-            <span>,</span>
-            <input
-              type="number"
-              value={compareAffine.b}
-              onChange={(event) =>
-                setCompareAffine({
-                  ...compareAffine,
-                  b: Number(event.target.value),
-                })
-              }
-            />
+            <div className="compose-inputs">
+              <label className="compose-input-label">
+                <span>a₂</span>
+                <select
+                  value={compareAffine.a}
+                  onChange={(event) =>
+                    setCompareAffine({
+                      ...compareAffine,
+                      a: Number(event.target.value),
+                    })
+                  }
+                  aria-label="Unit multiplier a2"
+                >
+                  {AFFINE_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="compose-input-label">
+                <span>b₂</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="25"
+                  value={compareAffine.b}
+                  onChange={(event) =>
+                    setCompareAffine({
+                      ...compareAffine,
+                      b: Math.max(0, Math.min(25, Number(event.target.value) || 0)),
+                    })
+                  }
+                  aria-label="Shift b2"
+                />
+              </label>
+            </div>
           </div>
-          <strong>
+          <strong className="compose-result">
             E
             <sub>
               ({affineResult.a}, {affineResult.b})
             </sub>
           </strong>
-          <small>
-            (5 × {compareAffine.a} mod 26, 5 × {compareAffine.b} + 8 mod 26)
+          <small className="compose-formula-note">
+            ((5 × {compareAffine.a}) mod 26, (5 × {compareAffine.b} + 8) mod 26) = ({affineResult.a}, {affineResult.b})
           </small>
         </div>
       </section>
@@ -917,11 +932,19 @@ const teamMembers: TeamMember[] = [
 ];
 
 function Team() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  const displayedId = hoveredId ?? pinnedId;
+
+  const togglePin = (id: string) => {
+    setPinnedId((current) => (current === id ? null : id));
+  };
+
   return (
-    <div className="page-wrap">
+    <div className="page-wrap team-page-wrap">
       <PageIntro
-        eyebrow="05 / THE TEAM"
+        eyebrow="06 / THE TEAM"
         title={
           <>
             Five roles.
@@ -932,21 +955,35 @@ function Team() {
       >
         <p>
           A collaborative research tool is itself a small system: distinct
-          roles, shared conventions, one verified result.
+          roles, shared conventions, one verified result. Hover to preview a profile,
+          click to pin it open, and click again to close.
         </p>
       </PageIntro>
-      <div className="team-grid">
-        {teamMembers.map((member, index) => (
-          <TeamMemberCard
-            key={member.id}
-            member={member}
-            number={`0${index + 1}`}
-            isSelected={selectedId === member.id}
-            onSelect={() => setSelectedId(member.id)}
-            onClose={() => setSelectedId(null)}
-          />
-        ))}
+
+      {/* Vertical Member Profiles Stack */}
+      <div className="team-vertical-list" role="region" aria-label="Team member profiles">
+        {teamMembers.map((member, index) => {
+          const isPinned = pinnedId === member.id;
+          const isDisplayed = displayedId === member.id;
+          return (
+            <VerticalTeamRow
+              key={member.id}
+              member={member}
+              number={`0${index + 1}`}
+              isPinned={isPinned}
+              isDisplayed={isDisplayed}
+              onTogglePin={() => togglePin(member.id)}
+              onHoverStart={() => setHoveredId(member.id)}
+              onHoverEnd={() => setHoveredId(null)}
+              onClose={() => {
+                setPinnedId(null);
+                setHoveredId(null);
+              }}
+            />
+          );
+        })}
       </div>
+
       <div className="team-note">
         <span>COLLABORATIVE RESEARCH / 2026</span>
         <p>
@@ -958,17 +995,23 @@ function Team() {
   );
 }
 
-function TeamMemberCard({
+function VerticalTeamRow({
   member,
   number,
-  isSelected,
-  onSelect,
+  isPinned,
+  isDisplayed,
+  onTogglePin,
+  onHoverStart,
+  onHoverEnd,
   onClose,
 }: {
   member: TeamMember;
   number: string;
-  isSelected: boolean;
-  onSelect: () => void;
+  isPinned: boolean;
+  isDisplayed: boolean;
+  onTogglePin: () => void;
+  onHoverStart: () => void;
+  onHoverEnd: () => void;
   onClose: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -979,55 +1022,98 @@ function TeamMemberCard({
     .slice(0, 2);
 
   return (
-    <motion.article
-      layout
-      className={isSelected ? "team-member-card expanded" : "team-member-card"}
-      transition={{ layout: { type: "spring", stiffness: 260, damping: 28 } }}
+    <article
+      className={`team-vertical-card ${isDisplayed ? "open" : ""} ${isPinned ? "pinned" : ""}`}
+      onMouseEnter={onHoverStart}
+      onMouseLeave={onHoverEnd}
     >
-      <motion.div layout className="team-portrait-column">
-        <button className="team-portrait-button" onClick={onSelect} aria-label={`Open profile for ${member.name}`}>
-          {imageFailed ? (
-            <span className="portrait-placeholder" aria-hidden="true">{initials}</span>
-          ) : (
-            <img src={member.image} alt={member.imageAlt} onError={() => setImageFailed(true)} />
-          )}
-          <span className="portrait-open-hint">{isSelected ? "PROFILE OPEN" : "OPEN PROFILE ↗"}</span>
-        </button>
-        <div className="team-compact-meta">
-          <span>{number}</span>
-          <strong>{member.name}</strong>
-          <small>{member.role}</small>
+      <div
+        className="team-row-summary"
+        onClick={onTogglePin}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isDisplayed}
+        aria-label={`${member.name}, ${member.role}. ${isPinned ? "Pinned open. Click to unpin." : "Click to pin profile open."}`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onTogglePin();
+          }
+        }}
+      >
+        <div className="team-summary-left">
+          <div className="team-avatar-container">
+            {imageFailed ? (
+              <span className="portrait-placeholder" aria-hidden="true">{initials}</span>
+            ) : (
+              <img src={member.image} alt={member.imageAlt} onError={() => setImageFailed(true)} />
+            )}
+          </div>
+          <div className="team-summary-text">
+            <div className="team-meta-tagline">
+              <span className="team-member-number">{number}</span>
+              <span className={`team-pin-badge ${isPinned ? "is-pinned" : ""}`}>
+                {isPinned ? "PINNED OPEN" : isDisplayed ? "PREVIEW" : "CLICK TO PIN"}
+              </span>
+            </div>
+            <h3 className="team-member-name">{member.name}</h3>
+            <span className="team-member-role-title">{member.role}</span>
+          </div>
         </div>
-      </motion.div>
-      <AnimatePresence initial={false} mode="wait">
-        {isSelected && (
+
+        <div className="team-action-hint">
+          <span className="action-hint-label">
+            {isPinned ? "Unpin" : "Details"}
+          </span>
+          <span className="action-hint-icon" aria-hidden="true">
+            {isDisplayed ? "◀" : "▶"}
+          </span>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isDisplayed && (
           <motion.div
             key={member.id}
-            className="team-profile-panel"
-            initial={{ opacity: 0, x: 24 }}
+            className="team-slideout-details"
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 24 }}
-            transition={{ duration: 0.28, ease: "easeOut" }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="profile-heading">
+            <div className="details-header-row">
               <div>
-                <p className="eyebrow">MEMBER PROFILE / {number}</p>
-                <h3>{member.name}</h3>
+                <span className="eyebrow">RESEARCH PROFILE / {number}</span>
+                <h4 className="details-heading">{member.name}</h4>
               </div>
-              <button className="profile-close" onClick={onClose} aria-label="Close member profile">×</button>
+              <button
+                type="button"
+                className="details-close-btn"
+                onClick={onClose}
+                aria-label={`Close profile for ${member.name}`}
+              >
+                ✕
+              </button>
             </div>
-            <div className="profile-meta">
-              <span>{member.registrationNumber}</span>
-              <strong>{member.role}</strong>
+
+            <div className="details-submeta">
+              <span className="details-reg-num">{member.registrationNumber}</span>
+              <strong className="details-role-highlight">{member.role}</strong>
             </div>
-            <div className="responsibility-list">
-              <span>RESPONSIBILITIES</span>
-              <ul>{member.responsibilities.map((responsibility) => <li key={responsibility}>{responsibility}</li>)}</ul>
+
+            <div className="details-responsibilities-box">
+              <span className="responsibilities-label">KEY RESPONSIBILITIES &amp; SCOPE</span>
+              <ul className="responsibilities-list">
+                {member.responsibilities.map((resp, i) => (
+                  <li key={i}>{resp}</li>
+                ))}
+              </ul>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.article>
+    </article>
   );
 }
 

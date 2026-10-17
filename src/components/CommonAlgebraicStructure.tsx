@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { MathView } from "./MathView";
 import {
   ALPHABET,
@@ -23,6 +23,61 @@ type SectionTab = "overview" | "reversible" | "axioms" | "composition" | "compar
 
 export function CommonAlgebraicStructure() {
   const [activeSection, setActiveSection] = useState<SectionTab>("overview");
+
+  const handleSectionNavigate = (tab: SectionTab) => {
+    setActiveSection(tab);
+    const sectionMap: Record<SectionTab, string> = {
+      overview: "section-overview",
+      reversible: "section-reversibility",
+      axioms: "section-axioms",
+      composition: "section-composition",
+      compare: "section-compare",
+      limits: "section-limits",
+    };
+    const targetId = sectionMap[tab];
+    const targetElem = document.getElementById(targetId);
+    if (targetElem) {
+      const headerOffset = 96;
+      const elementPosition = targetElem.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  useEffect(() => {
+    const sectionMap: Record<string, SectionTab> = {
+      "section-overview": "overview",
+      "section-reversibility": "reversible",
+      "section-axioms": "axioms",
+      "section-composition": "composition",
+      "section-compare": "compare",
+      "section-limits": "limits",
+    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const tab = sectionMap[entry.target.id];
+            if (tab) {
+              setActiveSection(tab);
+            }
+          }
+        }
+      },
+      {
+        rootMargin: "-100px 0px -60% 0px",
+        threshold: 0.1,
+      }
+    );
+    Object.keys(sectionMap).forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
 
   // SECTION A: Interactive demo state for three panels
   const [sectionAView, setSectionAView] = useState<"all" | "caesar" | "affine" | "permutation">("all");
@@ -219,40 +274,52 @@ export function CommonAlgebraicStructure() {
       {/* Visual Navigation Tabs */}
       <nav className="structure-nav-strip" aria-label="Visual learning sections">
         <button
+          type="button"
           className={activeSection === "overview" ? "active" : ""}
-          onClick={() => setActiveSection("overview")}
+          onClick={() => handleSectionNavigate("overview")}
+          aria-label="Scroll to Section 1: Three Systems"
         >
           <span>01</span> Three Systems
         </button>
         <button
+          type="button"
           className={activeSection === "reversible" ? "active" : ""}
-          onClick={() => setActiveSection("reversible")}
+          onClick={() => handleSectionNavigate("reversible")}
+          aria-label="Scroll to Section 2: Reversibility"
         >
           <span>02</span> Reversibility
         </button>
         <button
+          type="button"
           className={activeSection === "axioms" ? "active" : ""}
-          onClick={() => setActiveSection("axioms")}
+          onClick={() => handleSectionNavigate("axioms")}
+          aria-label="Scroll to Section 3: Group Axioms"
         >
           <span>03</span> Group Axioms
         </button>
         <button
+          type="button"
           className={activeSection === "composition" ? "active" : ""}
-          onClick={() => setActiveSection("composition")}
+          onClick={() => handleSectionNavigate("composition")}
+          aria-label="Scroll to Section 4: Composition Lab"
         >
           <span>04</span> Composition Lab
         </button>
         <button
+          type="button"
           className={activeSection === "compare" ? "active" : ""}
-          onClick={() => setActiveSection("compare")}
+          onClick={() => handleSectionNavigate("compare")}
+          aria-label="Scroll to Section 5: Group Comparison"
         >
           <span>05</span> Group Comparison
         </button>
         <button
+          type="button"
           className={activeSection === "limits" ? "active" : ""}
-          onClick={() => setActiveSection("limits")}
+          onClick={() => handleSectionNavigate("limits")}
+          aria-label="Scroll to Section 6: Concept Map & Limits"
         >
-          <span>06</span> Concept Map & Limits
+          <span>06</span> Concept Map &amp; Limits
         </button>
       </nav>
 
