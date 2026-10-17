@@ -5,6 +5,8 @@ import {
   MODULUS,
   AFFINE_UNITS,
   S4,
+  gcd,
+  modularInverse,
   caesarText,
   affineText,
   permutationText,
@@ -15,7 +17,8 @@ import {
   permutationCompose,
   permutationLabel,
   computeLetterFrequencies,
-  modularInverse,
+  transformationOrder,
+  type AffineKey,
 } from "../math/engine";
 
 const SAMPLE_TEXTS = [
@@ -34,8 +37,25 @@ const SAMPLE_TEXTS = [
 ];
 
 export function ExperimentsLab() {
+  // Navigation active tab
+  const [activeTab, setActiveTab] = useState<"frequency" | "inspector" | "composition" | "bruteforce">("frequency");
+
+  const scrollToExperiment = (id: string, tab: "frequency" | "inspector" | "composition" | "bruteforce") => {
+    setActiveTab(tab);
+    const elem = document.getElementById(id);
+    if (elem) {
+      const headerOffset = 96;
+      const elementPosition = elem.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
+    }
+  };
+
   // ---------------------------------------------------------------------------
-  // EXPERIMENT 1: Letter Frequency Analysis State
+  // EXPERIMENT 1: Letter Frequency Analysis & Invariance State
   // ---------------------------------------------------------------------------
   const [freqText, setFreqText] = useState(SAMPLE_TEXTS[0].text);
   const [freqSystem, setFreqSystem] = useState<"caesar" | "affine">("caesar");
@@ -58,7 +78,7 @@ export function ExperimentsLab() {
 
   const cipherFreqResult = useMemo(() => computeLetterFrequencies(cipherText), [cipherText]);
 
-  // Synchronized max scale across both distributions for consistent comparison
+  // Synchronized max scale across both distributions for honest visual comparison
   const sharedMaxScale = useMemo(() => {
     if (freqDisplayMode === "percentage") {
       const maxP = Math.max(plainFreqResult.maxPercentage, cipherFreqResult.maxPercentage, 10);
@@ -69,12 +89,18 @@ export function ExperimentsLab() {
     }
   }, [plainFreqResult, cipherFreqResult, freqDisplayMode]);
 
-  // Check if multiset of frequencies is invariant
+  // Verification: check if the multiset of counts is preserved
   const multisetMatches = useMemo(() => {
     const pCounts = plainFreqResult.frequencies.map((f) => f.count).sort((a, b) => a - b);
     const cCounts = cipherFreqResult.frequencies.map((f) => f.count).sort((a, b) => a - b);
     return JSON.stringify(pCounts) === JSON.stringify(cCounts);
   }, [plainFreqResult, cipherFreqResult]);
+
+  const distinctPlainLetters = useMemo(() => {
+    return plainFreqResult.frequencies.filter((f) => f.count > 0).length;
+  }, [plainFreqResult]);
+
+  const isAffineCoprime = useMemo(() => gcd(freqAffineA, MODULUS) === 1, [freqAffineA]);
 
   // ---------------------------------------------------------------------------
   // EXPERIMENT 2: Transformation Inspector State
@@ -85,6 +111,7 @@ export function ExperimentsLab() {
   const [inspAffineA, setInspAffineA] = useState(5);
   const [inspAffineB, setInspAffineB] = useState(8);
   const [inspPermIndex, setInspPermIndex] = useState(13); // [3, 1, 4, 2]
+  const [showCalculationTrace, setShowCalculationTrace] = useState(false);
 
   // Computations for Transformation Inspector
   const inspOutput = useMemo(() => {
@@ -107,11 +134,9 @@ export function ExperimentsLab() {
     }
   }, [inspSystem, inspOutput, inspShift, inspAffineA, inspAffineB, inspPermIndex]);
 
-  // Normalized input uppercase for strict equality check
   const inspIsVerified = useMemo(() => {
     const rawIn = inspInput.toUpperCase();
     if (inspSystem === "permutation") {
-      // S4 acts on complete blocks of 4 letters
       const letters = rawIn.replace(/[^A-Z]/g, "");
       const fullBlocks = Math.floor(letters.length / 4) * 4;
       if (fullBlocks === 0) return true;
@@ -120,8 +145,10 @@ export function ExperimentsLab() {
     return inspRecovered === rawIn;
   }, [inspInput, inspRecovered, inspSystem]);
 
+  const inspAffineCoprime = useMemo(() => gcd(inspAffineA, MODULUS) === 1, [inspAffineA]);
+
   // ---------------------------------------------------------------------------
-  // EXPERIMENT 3: Composition and Commutativity Lab State
+  // EXPERIMENT 3: Composition & Commutativity Lab State
   // ---------------------------------------------------------------------------
   const [commLabSystem, setCommLabSystem] = useState<"caesar" | "affine" | "permutation">("affine");
   const [commCaesarK1, setCommCaesarK1] = useState(3);
@@ -137,83 +164,125 @@ export function ExperimentsLab() {
 
   const [commTestString, setCommTestString] = useState("MATH");
 
-  // Computations for Commutativity Lab
-  // Route A: T2 o T1 (T1 applied first, then T2 applied to result)
-  // Route B: T1 o T2 (T2 applied first, then T1 applied to result)
+  // Computations for Commutativity Lab:
+  // Path A: Apply T1 first, then T2 (T2 o T1)(x) = T2(T1(x))
+  // Path B: Apply T2 first, then T1 (T1 o T2)(x) = T1(T2(x))
   const commEvaluation = useMemo(() => {
     if (commLabSystem === "caesar") {
       const k1 = commCaesarK1;
       const k2 = commCaesarK2;
-      const routeA_mid = caesarText(commTestString, k1);
-      const routeA_final = caesarText(routeA_mid, k2);
-      const routeB_mid = caesarText(commTestString, k2);
-      const routeB_final = caesarText(routeB_mid, k1);
+      const pathA_mid = caesarText(commTestString, k1);
+      const pathA_final = caesarText(pathA_mid, k2);
+      const pathB_mid = caesarText(commTestString, k2);
+      const pathB_final = caesarText(pathB_mid, k1);
       const compK = (k1 + k2) % MODULUS;
-      const isCommutative = true; // Caesar shifts are always abelian
+      const isCommutative = true; // Caesar shifts over Z26 are always abelian
+
       return {
-        routeA: { mid: routeA_mid, final: routeA_final, formula: `E_${k2} \\circ E_${k1} = E_{${compK}}` },
-        routeB: { mid: routeB_mid, final: routeB_final, formula: `E_${k1} \\circ E_${k2} = E_{${compK}}` },
+        pathA: {
+          mid: pathA_mid,
+          final: pathA_final,
+          formula: `E_{${k2}} \\circ E_{${k1}} = E_{(${k2} + ${k1}) \\bmod 26} = E_{${compK}}`,
+        },
+        pathB: {
+          mid: pathB_mid,
+          final: pathB_final,
+          formula: `E_{${k1}} \\circ E_{${k2}} = E_{(${k1} + ${k2}) \\bmod 26} = E_{${compK}}`,
+        },
         isCommutative,
-        summary: `Both orders evaluate to identical shift k = ${compK}. Caesar group C₂₆ is strictly abelian.`,
+        counterExample: null,
+        domainProof: "Equal for all 26 elements in ℤ₂₆: integer addition modulo 26 is abelian.",
+        summary: `Both orders evaluate identically to shift k = ${compK}. The cyclic group C₂₆ is strictly abelian.`,
       };
     } else if (commLabSystem === "affine") {
-      const key1 = { a: commAffineA1, b: commAffineB1 };
-      const key2 = { a: commAffineA2, b: commAffineB2 };
-      // T2 o T1 has key2 applied second, key1 first: affineCompose(key2, key1)
+      const key1: AffineKey = { a: commAffineA1, b: commAffineB1 };
+      const key2: AffineKey = { a: commAffineA2, b: commAffineB2 };
+
+      // T2 o T1: key2 applied second, key1 first
       const comp21 = affineCompose(key2, key1);
-      // T1 o T2 has key1 applied second, key2 first: affineCompose(key1, key2)
+      // T1 o T2: key1 applied second, key2 first
       const comp12 = affineCompose(key1, key2);
 
-      const routeA_mid = affineText(commTestString, key1);
-      const routeA_final = affineText(routeA_mid, key2);
-      const routeB_mid = affineText(commTestString, key2);
-      const routeB_final = affineText(routeB_mid, key1);
+      const pathA_mid = affineText(commTestString, key1);
+      const pathA_final = affineText(pathA_mid, key2);
+      const pathB_mid = affineText(commTestString, key2);
+      const pathB_final = affineText(pathB_mid, key1);
+
+      // Check full domain equality across all 26 alphabet residues
+      let counterChar: string | null = null;
+      let counterA = "";
+      let counterB = "";
+      for (const char of ALPHABET) {
+        const fullA = affineText(affineText(char, key1, false), key2, false);
+        const fullB = affineText(affineText(char, key2, false), key1, false);
+        if (fullA !== fullB) {
+          counterChar = char;
+          counterA = fullA;
+          counterB = fullB;
+          break;
+        }
+      }
 
       const isCommutative = comp21.a === comp12.a && comp21.b === comp12.b;
+
       return {
-        routeA: {
-          mid: routeA_mid,
-          final: routeA_final,
-          formula: `T_2 \\circ T_1 = E_{${comp21.a}, ${comp21.b}}`,
+        pathA: {
+          mid: pathA_mid,
+          final: pathA_final,
+          formula: `T_2 \\circ T_1 = E_{(${key2.a} \\cdot ${key1.a}) \\bmod 26, (${key2.a} \\cdot ${key1.b} + ${key2.b}) \\bmod 26} = E_{${comp21.a}, ${comp21.b}}`,
         },
-        routeB: {
-          mid: routeB_mid,
-          final: routeB_final,
-          formula: `T_1 \\circ T_2 = E_{${comp12.a}, ${comp12.b}}`,
+        pathB: {
+          mid: pathB_mid,
+          final: pathB_final,
+          formula: `T_1 \\circ T_2 = E_{(${key1.a} \\cdot ${key2.a}) \\bmod 26, (${key1.a} \\cdot ${key2.b} + ${key1.b}) \\bmod 26} = E_{${comp12.a}, ${comp12.b}}`,
         },
         isCommutative,
+        counterExample: counterChar ? { input: counterChar, outA: counterA, outB: counterB } : null,
+        domainProof: isCommutative
+          ? "Equal for all 26 alphabet residues: T₂(T₁(x)) = T₁(T₂(x)) ∀ x ∈ ℤ₂₆."
+          : `Disagrees across domain: T₂ ∘ T₁ = E_{${comp21.a}, ${comp21.b}} ≠ T₁ ∘ T₂ = E_{${comp12.a}, ${comp12.b}}.`,
         summary: isCommutative
-          ? `Selected affine keys commute (T₂ ∘ T₁ = T₁ ∘ T₂).`
-          : `T₂ ∘ T₁ = E_(${comp21.a}, ${comp21.b}) ≠ T₁ ∘ T₂ = E_(${comp12.a}, ${comp12.b}). Order matters! G_aff is non-abelian.`,
+          ? `The chosen affine parameters commute.`
+          : `T₂ ∘ T₁ = E_(${comp21.a}, ${comp21.b}) ≠ T₁ ∘ T₂ = E_(${comp12.a}, ${comp12.b}). Composition order matters: AGL(1, 26) is non-abelian.`,
       };
     } else {
       const p1 = S4[commPermIdx1] ?? S4[0];
       const p2 = S4[commPermIdx2] ?? S4[0];
+
       // P2 o P1: permutationCompose(p2, p1)
       const comp21 = permutationCompose(p2, p1);
       // P1 o P2: permutationCompose(p1, p2)
       const comp12 = permutationCompose(p1, p2);
 
-      const routeA_mid = permutationText(p1, commTestString);
-      const routeA_final = permutationText(p2, routeA_mid);
-      const routeB_mid = permutationText(p2, commTestString);
-      const routeB_final = permutationText(p1, routeB_mid);
+      const pathA_mid = permutationText(p1, commTestString);
+      const pathA_final = permutationText(p2, pathA_mid);
+      const pathB_mid = permutationText(p2, commTestString);
+      const pathB_final = permutationText(p1, pathB_mid);
 
       const isCommutative = comp21.every((val, idx) => val === comp12[idx]);
+
+      const counterInput = "ABCD";
+      const counterA = permutationApply(comp21, counterInput);
+      const counterB = permutationApply(comp12, counterInput);
+
       return {
-        routeA: {
-          mid: routeA_mid,
-          final: routeA_final,
+        pathA: {
+          mid: pathA_mid,
+          final: pathA_final,
           formula: `\\pi_2 \\circ \\pi_1 = ${permutationLabel(comp21)}`,
         },
-        routeB: {
-          mid: routeB_mid,
-          final: routeB_final,
+        pathB: {
+          mid: pathB_mid,
+          final: pathB_final,
           formula: `\\pi_1 \\circ \\pi_2 = ${permutationLabel(comp12)}`,
         },
         isCommutative,
+        counterExample: !isCommutative ? { input: counterInput, outA: counterA, outB: counterB } : null,
+        domainProof: isCommutative
+          ? "Permutations coincide on all 4 coordinate positions."
+          : `Permutations differ: π₂ ∘ π₁ = ${permutationLabel(comp21)} ≠ π₁ ∘ π₂ = ${permutationLabel(comp12)}.`,
         summary: isCommutative
-          ? `Selected permutations commute.`
+          ? `The chosen position permutations commute.`
           : `π₂ ∘ π₁ = ${permutationLabel(comp21)} ≠ π₁ ∘ π₂ = ${permutationLabel(comp12)}. Position permutations in S₄ do not commute in general.`,
       };
     }
@@ -230,60 +299,103 @@ export function ExperimentsLab() {
     commTestString,
   ]);
 
+  // ---------------------------------------------------------------------------
+  // EXPERIMENT 4: Brute-Force a Shift & Observation Log State
+  // ---------------------------------------------------------------------------
+  const [bruteCipher, setBruteCipher] = useState("KHOOR ZRUOG");
+  const [bruteSelectedKey, setBruteSelectedKey] = useState(3);
+  const bruteGuesses = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => ({
+      key: index,
+      text: caesarText(bruteCipher, -index),
+    }));
+  }, [bruteCipher]);
+
+  const bruteOrder = useMemo(() => {
+    return transformationOrder((value) => (value + 3) % 26, 26);
+  }, []);
+
   return (
     <div className="page-wrap experiments-page">
+      {/* 6. Purposeful Page Introduction */}
       <div className="page-intro">
         <p className="eyebrow">05 / MATHEMATICAL EXPERIMENTS LABORATORY</p>
         <h1>
-          Test the math.
+          Experiments in
           <br />
-          <em>Verify the claims.</em>
+          <em>Transformation.</em>
         </h1>
         <p>
-          A hands-on testing laboratory for letter frequencies, reversible transformation traces,
-          and algebraic commutativity. Change inputs, observe transformations, and verify the
-          exact mathematical consequences.
+          Investigate how algebraic structure governs reversible transformations, letter frequencies,
+          and the order in which operations are composed.
         </p>
+
+        {/* Compact Navigation Strip */}
+        <nav className="exp-nav-strip" aria-label="Experiment sections navigation">
+          <button
+            type="button"
+            className={activeTab === "frequency" ? "active" : ""}
+            onClick={() => scrollToExperiment("exp-frequency", "frequency")}
+          >
+            <span>01</span> Frequency &amp; Invariance
+          </button>
+          <button
+            type="button"
+            className={activeTab === "inspector" ? "active" : ""}
+            onClick={() => scrollToExperiment("exp-inspector", "inspector")}
+          >
+            <span>02</span> Transformation Inspector
+          </button>
+          <button
+            type="button"
+            className={activeTab === "composition" ? "active" : ""}
+            onClick={() => scrollToExperiment("exp-composition", "composition")}
+          >
+            <span>03</span> Composition &amp; Commutativity
+          </button>
+          <button
+            type="button"
+            className={activeTab === "bruteforce" ? "active" : ""}
+            onClick={() => scrollToExperiment("exp-bruteforce", "bruteforce")}
+          >
+            <span>04</span> Brute-Force &amp; Observation Log
+          </button>
+        </nav>
       </div>
 
       {/* ===================================================================== */}
-      {/* EXPERIMENT 1: LETTER FREQUENCY EXPERIMENT                              */}
+      {/* EXPERIMENT 1: LETTER FREQUENCY ANALYSIS & INVARIANCE                  */}
       {/* ===================================================================== */}
-      <section className="experiment-card-module" id="exp-letter-frequency">
+      <section className="experiment-card-module" id="exp-frequency">
         <div className="exp-module-header">
           <div className="exp-meta-badge">
             <span>EXPERIMENT 01</span>
             <span className="badge-tag">DISTRIBUTION ANALYSIS</span>
           </div>
           <h2 className="exp-module-title">Letter-Frequency Analysis &amp; Invariance</h2>
-          
+
           <div className="exp-guide-grid">
             <div className="guide-box">
-              <span className="guide-q">WHAT AM I TESTING?</span>
+              <span className="guide-q">1. QUESTION</span>
+              <p>What happens to letter frequencies when a message is encrypted?</p>
+            </div>
+            <div className="guide-box">
+              <span className="guide-q">2. OPERATION</span>
               <p>
-                How uniform character transformations alter the appearance of a message while preserving
-                its underlying statistical frequency distribution.
+                Apply a monoalphabetic transformation (Caesar shift or Affine map). Observe how letter labels are permuted across the alphabet.
               </p>
             </div>
             <div className="guide-box">
-              <span className="guide-q">WHAT SHOULD I LOOK AT?</span>
+              <span className="guide-q">3. MATHEMATICAL INSIGHT</span>
               <p>
-                The side-by-side histograms. Notice how shifting or permuting values moves the peaks to new letters,
-                while the overall set of bar heights (the multiset) remains identical.
-              </p>
-            </div>
-            <div className="guide-box">
-              <span className="guide-q">WHAT DOES IT MEAN MATHEMATICALLY?</span>
-              <p>
-                Because monoalphabetic substitutions are bijections, they merely relabel the domain:
+                Because encryption is a bijection on the alphabet, the multiset of letter counts is strictly preserved:
                 <MathView math="f(c) = \frac{\operatorname{count}(c)}{N} \times 100\%" />.
-                The frequency histogram is translated modulo 26, but zero entropy is added.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Input & Sample Controls */}
+        {/* 9. Live Transformation Workflow Controls */}
         <div className="exp-controls-strip">
           <div className="sample-buttons-row">
             <span className="ctrl-label">PRESET TEXT SAMPLES:</span>
@@ -297,10 +409,23 @@ export function ExperimentsLab() {
                 {sample.label}
               </button>
             ))}
+            <button
+              type="button"
+              className="reset-btn"
+              onClick={() => {
+                setFreqText(SAMPLE_TEXTS[0].text);
+                setFreqShift(3);
+                setFreqAffineA(5);
+                setFreqAffineB(8);
+                setFreqSystem("caesar");
+              }}
+            >
+              Reset ↻
+            </button>
           </div>
 
           <div className="custom-text-area-wrap">
-            <label htmlFor="custom-freq-input">Custom message for frequency analysis:</label>
+            <label htmlFor="custom-freq-input">Plaintext Message for Frequency Analysis:</label>
             <textarea
               id="custom-freq-input"
               rows={2}
@@ -310,9 +435,10 @@ export function ExperimentsLab() {
             />
           </div>
 
+          {/* Transformation Controls */}
           <div className="exp-params-row">
             <div className="param-subgroup">
-              <span className="ctrl-label">CIPHER SYSTEM:</span>
+              <span className="ctrl-label">TRANSFORMATION:</span>
               <div className="toggle-group">
                 <button
                   type="button"
@@ -333,12 +459,13 @@ export function ExperimentsLab() {
 
             {freqSystem === "caesar" ? (
               <div className="param-subgroup range-param">
-                <span className="ctrl-label">SHIFT KEY (k): {freqShift}</span>
+                <span className="ctrl-label">SHIFT KEY (k): <strong>{freqShift}</strong></span>
                 <input
                   type="range"
                   min={0}
                   max={25}
                   value={freqShift}
+                  aria-label="Caesar shift key"
                   onChange={(e) => setFreqShift(Number(e.target.value))}
                 />
               </div>
@@ -362,10 +489,14 @@ export function ExperimentsLab() {
                     min={0}
                     max={25}
                     value={freqAffineB}
+                    aria-label="Affine shift parameter b"
                     onChange={(e) => setFreqAffineB(Number(e.target.value))}
                   />
                   <span className="val-badge">{freqAffineB}</span>
                 </label>
+                {!isAffineCoprime && (
+                  <span className="inline-err">Invalid: gcd(a,26) ≠ 1</span>
+                )}
               </div>
             )}
 
@@ -391,29 +522,66 @@ export function ExperimentsLab() {
           </div>
         </div>
 
-        {/* Multiset Invariance Callout */}
+        {/* Live Transformation Sequence: Plaintext -> Encryption -> Ciphertext */}
+        <div className="transformation-sequence-box">
+          <div className="seq-step">
+            <span className="seq-label">PLAINTEXT</span>
+            <div className="seq-content">{freqText || "(empty text)"}</div>
+          </div>
+          <div className="seq-arrow">
+            <span>⟶</span>
+            <small>
+              {freqSystem === "caesar"
+                ? `E_${freqShift}(x)`
+                : `E_(${freqAffineA},${freqAffineB})(x)`}
+            </small>
+          </div>
+          <div className="seq-step highlight">
+            <span className="seq-label">CIPHERTEXT</span>
+            <div className="seq-content">{cipherText || "(empty text)"}</div>
+          </div>
+        </div>
+
+        {/* 11. Multiset Invariance Callout & Mathematical Statistics */}
         <div className="multiset-banner">
           <div className="multiset-indicator">
-            <span className="check-dot" />
+            <span className={`check-dot ${multisetMatches ? "ok" : ""}`} />
             <strong>Multiset Invariance Verified:</strong>
           </div>
           <p>
             {multisetMatches
-              ? `The set of frequency values for plaintext and ciphertext is strictly identical. The transformation only permutes which letter carries which frequency.`
+              ? `The multiset of letter frequencies is strictly preserved. Encryption permutes the alphabet symbols without altering the distribution of character counts.`
               : `Analyzing distribution properties.`}
-            {" "}Sample size: <strong>N = {plainFreqResult.totalAlphabetic} alphabetic characters</strong> (spaces and punctuation excluded).
           </p>
+          <div className="multiset-metrics-strip">
+            <div className="metric-chip">
+              <span>Alphabetic Characters (N):</span>
+              <strong>{plainFreqResult.totalAlphabetic}</strong>
+            </div>
+            <div className="metric-chip">
+              <span>Distinct Letters Present:</span>
+              <strong>{distinctPlainLetters} of 26</strong>
+            </div>
+            <div className="metric-chip">
+              <span>Max Letter Count:</span>
+              <strong>{plainFreqResult.maxCount}</strong>
+            </div>
+            <div className="metric-chip">
+              <span>Multiset Match:</span>
+              <strong className="badge-match">{multisetMatches ? "TRUE (Invariant)" : "FALSE"}</strong>
+            </div>
+          </div>
         </div>
 
-        {/* Side-by-Side Histograms */}
+        {/* 10. Publication-Quality Frequency Visualisations */}
         <div className="frequency-charts-duo">
           {/* Plaintext Chart */}
           <div className="freq-chart-panel">
             <div className="chart-header">
               <div className="chart-title-group">
                 <span className="chart-tag plain-tag">INPUT DISTRIBUTION</span>
-                <h3>Plaintext Frequencies</h3>
-                <small>Sample: N = {plainFreqResult.totalAlphabetic} letters</small>
+                <h3>Plaintext Letter Frequencies</h3>
+                <small>Analysed: N = {plainFreqResult.totalAlphabetic} letters (spaces and punctuation excluded)</small>
               </div>
               <div className="chart-scale-info">
                 <span>Scale: 0 – {sharedMaxScale}{freqDisplayMode === "percentage" ? "%" : " chars"}</span>
@@ -427,7 +595,7 @@ export function ExperimentsLab() {
               </div>
             ) : (
               <div className="histogram-bars-wrapper">
-                <div className="bars-container">
+                <div className="bars-container" role="graphics-document" aria-label="Plaintext letter frequency bar chart">
                   {plainFreqResult.frequencies.map((item) => {
                     const val = freqDisplayMode === "percentage" ? item.percentage : item.count;
                     const heightPercent = sharedMaxScale > 0 ? (val / sharedMaxScale) * 100 : 0;
@@ -438,6 +606,8 @@ export function ExperimentsLab() {
                         className={`bar-column ${isHovered ? "hovered" : ""}`}
                         onMouseEnter={() => setHoveredLetter(item.letter)}
                         onMouseLeave={() => setHoveredLetter(null)}
+                        tabIndex={0}
+                        aria-label={`Letter ${item.letter}: count ${item.count}, ${item.percentage}%`}
                       >
                         <div className="bar-track">
                           <div
@@ -466,11 +636,12 @@ export function ExperimentsLab() {
             <div className="chart-header">
               <div className="chart-title-group">
                 <span className="chart-tag cipher-tag">TRANSFORMED DISTRIBUTION</span>
-                <h3>Ciphertext Frequencies</h3>
+                <h3>Ciphertext Letter Frequencies</h3>
                 <small>
                   {freqSystem === "caesar"
                     ? `Caesar Shift k = ${freqShift}`
-                    : `Affine Key (${freqAffineA}, ${freqAffineB})`}
+                    : `Affine Map (${freqAffineA}, ${freqAffineB})`}
+                  {" "}· N = {cipherFreqResult.totalAlphabetic} letters
                 </small>
               </div>
               <div className="chart-scale-info">
@@ -484,7 +655,7 @@ export function ExperimentsLab() {
               </div>
             ) : (
               <div className="histogram-bars-wrapper">
-                <div className="bars-container">
+                <div className="bars-container" role="graphics-document" aria-label="Ciphertext letter frequency bar chart">
                   {cipherFreqResult.frequencies.map((item) => {
                     const val = freqDisplayMode === "percentage" ? item.percentage : item.count;
                     const heightPercent = sharedMaxScale > 0 ? (val / sharedMaxScale) * 100 : 0;
@@ -495,6 +666,8 @@ export function ExperimentsLab() {
                         className={`bar-column ${isHovered ? "hovered" : ""}`}
                         onMouseEnter={() => setHoveredLetter(item.letter)}
                         onMouseLeave={() => setHoveredLetter(null)}
+                        tabIndex={0}
+                        aria-label={`Letter ${item.letter}: count ${item.count}, ${item.percentage}%`}
                       >
                         <div className="bar-track">
                           <div
@@ -519,19 +692,22 @@ export function ExperimentsLab() {
           </div>
         </div>
 
-        {/* Statistical Footnote */}
+        {/* Mathematical Interpretation Area */}
         <div className="chart-educational-note">
-          <span>Cryptanalytic Note:</span> Frequency analysis exploits the fact that natural language letters
-          have non-uniform probabilities (e.g. English &apos;E&apos; ≈ 12.7%, &apos;T&apos; ≈ 9.1%).
-          Because monoalphabetic ciphers do not alter the shape of the probability multiset,
-          an adversary can align peak frequencies to deduce keys without brute-force enumeration.
+          <div className="note-title">Mathematical Interpretation &amp; Cryptanalytic Boundary</div>
+          <p>
+            Because monoalphabetic substitutions are bijections on the finite set of letters, they preserve the multiset of counts identically.
+            Every peak in the plaintext distribution appears with the exact same height in the ciphertext distribution, shifted to a new character.
+            However, frequency analysis alone does not guarantee automatic recovery of arbitrary plaintext: short messages or texts with flat distributions may be ambiguous,
+            illustrating the difference between a mathematical invariant and an empirical cryptanalysis outcome.
+          </p>
         </div>
       </section>
 
       {/* ===================================================================== */}
       {/* EXPERIMENT 2: TRANSFORMATION INSPECTOR                                */}
       {/* ===================================================================== */}
-      <section className="experiment-card-module" id="exp-transformation-inspector">
+      <section className="experiment-card-module" id="exp-inspector">
         <div className="exp-module-header">
           <div className="exp-meta-badge">
             <span>EXPERIMENT 02</span>
@@ -541,30 +717,25 @@ export function ExperimentsLab() {
 
           <div className="exp-guide-grid">
             <div className="guide-box">
-              <span className="guide-q">WHAT AM I TESTING?</span>
+              <span className="guide-q">1. QUESTION</span>
+              <p>How does algebraic inversion guarantee exact plaintext recovery?</p>
+            </div>
+            <div className="guide-box">
+              <span className="guide-q">2. OPERATION</span>
               <p>
-                The complete forward and inverse journey of a message:
-                Key selection → Forward Encryption → Algebraic Inversion → Plaintext Recovery.
+                Encrypt an input message, compute the exact algebraic inverse key, and verify that decryption perfectly unwinds encryption.
               </p>
             </div>
             <div className="guide-box">
-              <span className="guide-q">WHAT SHOULD I LOOK AT?</span>
+              <span className="guide-q">3. MATHEMATICAL PROOF</span>
               <p>
-                The seven distinct stages: verify that the inverse key derived algebraically
-                faithfully unwinds every single character or block without error.
-              </p>
-            </div>
-            <div className="guide-box">
-              <span className="guide-q">WHAT DOES IT MEAN MATHEMATICALLY?</span>
-              <p>
-                Every element <MathView math="T" /> in a group has an inverse <MathView math="T^{-1}" /> such that
-                <MathView math="T^{-1}(T(x)) = x" />. Reversibility is an algebraic certainty, not an approximation.
+                In every group <MathView math="(G, \circ)" />, every element <MathView math="T" /> has a unique inverse <MathView math="T^{-1}" /> satisfying <MathView math="T^{-1}(T(x)) = x" />.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Inspector Controls */}
+        {/* 13. System-Specific Controls */}
         <div className="inspector-controls-bar">
           <div className="system-pill-selector">
             <button
@@ -579,7 +750,7 @@ export function ExperimentsLab() {
               className={inspSystem === "affine" ? "active" : ""}
               onClick={() => setInspSystem("affine")}
             >
-              Affine G_aff
+              Affine AGL(1, 26)
             </button>
             <button
               type="button"
@@ -639,6 +810,9 @@ export function ExperimentsLab() {
                   />
                   <span className="val-badge">{inspAffineB}</span>
                 </label>
+                {!inspAffineCoprime && (
+                  <span className="inline-err">gcd(a, 26) must be 1</span>
+                )}
               </div>
             )}
 
@@ -658,7 +832,7 @@ export function ExperimentsLab() {
               </label>
             )}
 
-            {/* Presets Button */}
+            {/* Verified Presets */}
             <button
               type="button"
               className="quick-preset-btn"
@@ -676,221 +850,215 @@ export function ExperimentsLab() {
                 }
               }}
             >
-              Load verified preset ↻
+              Load Preset ↻
             </button>
           </div>
         </div>
 
-        {/* The 7-Stage Inspector Display */}
-        <div className="inspector-stages-grid">
-          {/* 1. Selected Key */}
-          <div className="insp-stage-card">
-            <span className="stage-num">01 / SELECTED KEY</span>
-            <div className="stage-body">
-              {inspSystem === "caesar" && <strong>k = {inspShift}</strong>}
-              {inspSystem === "affine" && <strong>a = {inspAffineA}, b = {inspAffineB}</strong>}
-              {inspSystem === "permutation" && <strong>P = {permutationLabel(S4[inspPermIndex])}</strong>}
-              <small>Forward transformation key</small>
+        {/* 12. Unmistakable Pipeline: Plaintext -> Encryption -> Ciphertext -> Decryption -> Recovered Plaintext */}
+        <div className="transformation-pipeline-card">
+          <div className="pipe-stage-node">
+            <span className="pipe-stage-tag">PLAINTEXT (x)</span>
+            <strong className="pipe-stage-val">{inspInput.toUpperCase() || "(empty)"}</strong>
+            <small>Input message</small>
+          </div>
+
+          <div className="pipe-trans-connector">
+            <span className="arrow-sym">⟶</span>
+            <div className="pipe-rule-box">
+              <span className="rule-title">Encryption Rule</span>
+              <code>
+                {inspSystem === "caesar" && `E_${inspShift}(x) = (x + ${inspShift}) mod 26`}
+                {inspSystem === "affine" && `E_(${inspAffineA}, ${inspAffineB})(x) = (${inspAffineA}x + ${inspAffineB}) mod 26`}
+                {inspSystem === "permutation" && `P = ${permutationLabel(S4[inspPermIndex])}`}
+              </code>
             </div>
           </div>
 
-          {/* 2. Original Input */}
-          <div className="insp-stage-card">
-            <span className="stage-num">02 / ORIGINAL INPUT (x)</span>
-            <div className="stage-body">
-              <strong>{inspInput.toUpperCase() || "(empty)"}</strong>
-              <small>{inspInput.replace(/[^A-Za-z]/g, "").length} alphabetic characters</small>
+          <div className="pipe-stage-node highlight">
+            <span className="pipe-stage-tag">CIPHERTEXT (y)</span>
+            <strong className="pipe-stage-val">{inspOutput || "(empty)"}</strong>
+            <small>Forward output</small>
+          </div>
+
+          <div className="pipe-trans-connector">
+            <span className="arrow-sym">⟶</span>
+            <div className="pipe-rule-box">
+              <span className="rule-title">Decryption Rule</span>
+              <code>
+                {inspSystem === "caesar" && `D_${inspShift}(y) = (y - ${inspShift}) mod 26`}
+                {inspSystem === "affine" && (() => {
+                  const inv = affineInverse({ a: inspAffineA, b: inspAffineB });
+                  return `D_(${inspAffineA}, ${inspAffineB})(y) = ${inv.a}(y - ${inspAffineB}) mod 26`;
+                })()}
+                {inspSystem === "permutation" && `P⁻¹ = ${permutationLabel(permutationInverse(S4[inspPermIndex]))}`}
+              </code>
             </div>
           </div>
 
-          {/* 3. Transformed Output */}
-          <div className="insp-stage-card highlight-card">
-            <span className="stage-num">03 / FORWARD OUTPUT E(x)</span>
-            <div className="stage-body">
-              <strong>{inspOutput || "(empty)"}</strong>
-              <small>Ciphertext after transformation</small>
-            </div>
-          </div>
-
-          {/* 4. Inverse Transformation */}
-          <div className="insp-stage-card">
-            <span className="stage-num">04 / ALGEBRAIC INVERSE</span>
-            <div className="stage-body">
-              {inspSystem === "caesar" && (
-                <>
-                  <strong>k⁻¹ = {(-inspShift + 26) % 26}</strong>
-                  <small>D_k(y) = (y - {inspShift}) mod 26</small>
-                </>
-              )}
-              {inspSystem === "affine" && (
-                <>
-                  {(() => {
-                    const inv = affineInverse({ a: inspAffineA, b: inspAffineB });
-                    return (
-                      <>
-                        <strong>a⁻¹ = {inv.a}, b′ = {inv.b}</strong>
-                        <small>E_({inv.a}, {inv.b})(y)</small>
-                      </>
-                    );
-                  })()}
-                </>
-              )}
-              {inspSystem === "permutation" && (
-                <>
-                  <strong>P⁻¹ = {permutationLabel(permutationInverse(S4[inspPermIndex]))}</strong>
-                  <small>Inverse coordinate map</small>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* 5. Recovered Input */}
-          <div className="insp-stage-card">
-            <span className="stage-num">05 / RECOVERED INPUT</span>
-            <div className="stage-body">
-              <strong>{inspRecovered || "(empty)"}</strong>
-              <small>D(E(x)) output</small>
-            </div>
-          </div>
-
-          {/* 6. Success Verification */}
-          <div className="insp-stage-card verified-card">
-            <span className="stage-num">06 / VERIFICATION STATUS</span>
-            <div className="stage-body">
-              {inspIsVerified ? (
-                <>
-                  <strong className="status-badge success">✓ EXACT MATCH</strong>
-                  <small>f⁻¹(f(x)) = x verified mathematically</small>
-                </>
-              ) : (
-                <>
-                  <strong className="status-badge error">⚠ MISMATCH</strong>
-                  <small>Reversibility check</small>
-                </>
-              )}
-            </div>
+          <div className="pipe-stage-node verified">
+            <span className="pipe-stage-tag">RECOVERED (x′)</span>
+            <strong className="pipe-stage-val">{inspRecovered || "(empty)"}</strong>
+            <small>Decrypted result</small>
           </div>
         </div>
 
-        {/* 7. Step-by-Step Mathematical Explanation */}
-        <div className="insp-derivation-tray">
-          <div className="tray-title">
-            <span>07 / COMPUTED ARITHMETIC DERIVATION</span>
-            <code>
-              {inspSystem === "caesar" && `E_${inspShift}(x) = (x + ${inspShift}) mod 26  |  D_${inspShift}(y) = (y - ${inspShift}) mod 26`}
-              {inspSystem === "affine" && `E_(${inspAffineA}, ${inspAffineB})(x) = (${inspAffineA}x + ${inspAffineB}) mod 26`}
-              {inspSystem === "permutation" && `Permutation ${permutationLabel(S4[inspPermIndex])} acting on 4-letter coordinates`}
-            </code>
+        {/* Verification Status Banner */}
+        <div className={`recovery-verdict-banner ${inspIsVerified ? "success" : "mismatch"}`}>
+          <div className="verdict-icon">{inspIsVerified ? "✓" : "⚠"}</div>
+          <div className="verdict-text">
+            <strong>
+              {inspIsVerified
+                ? "Recovered successfully — the decrypted text matches the original."
+                : "Recovery mismatch — inspect key validity or input parameters."}
+            </strong>
+            <p>
+              {inspSystem === "caesar" && "Caesar decryption unwinds addition by applying additive inverse (26 - k) mod 26."}
+              {inspSystem === "affine" && `Affine decryption uses modular multiplicative inverse a⁻¹ = ${modularInverse(inspAffineA, MODULUS)}.`}
+              {inspSystem === "permutation" && "S₄ permutation decryption restores letter positions using two-sided inverse permutation."}
+            </p>
           </div>
+        </div>
 
-          {inspSystem === "caesar" && (
-            <div className="calc-trace-mini-table">
-              <table className="calculation-table">
-                <thead>
-                  <tr>
-                    <th>Plain Char</th>
-                    <th>x</th>
-                    <th>Forward Calculation: (x + {inspShift}) mod 26</th>
-                    <th>Cipher Char</th>
-                    <th>Inverse Calculation: (y - {inspShift}) mod 26</th>
-                    <th>Recovered</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inspInput.toUpperCase().split("").filter((c) => /^[A-Z]$/.test(c)).slice(0, 6).map((c, idx) => {
-                    const x = c.charCodeAt(0) - 65;
-                    const y = (x + inspShift) % 26;
-                    const rec = (y - inspShift + 26) % 26;
-                    return (
-                      <tr key={idx}>
-                        <td><strong>{c}</strong></td>
-                        <td>{x}</td>
-                        <td><code>({x} + {inspShift}) mod 26 = {y}</code></td>
-                        <td><strong>{ALPHABET[y]}</strong></td>
-                        <td><code>({y} - {inspShift}) mod 26 = {rec}</code></td>
-                        <td><span className="badge-yes">{ALPHABET[rec]}</span></td>
+        {/* 14. Progressive Disclosure: Explore the calculation */}
+        <div className="calculation-disclosure-container">
+          <button
+            type="button"
+            className="disclosure-toggle-btn"
+            onClick={() => setShowCalculationTrace(!showCalculationTrace)}
+            aria-expanded={showCalculationTrace}
+          >
+            <span>{showCalculationTrace ? "▼" : "▶"}</span>
+            <strong>Explore the calculation</strong>
+            <small>{showCalculationTrace ? "Collapse derivation steps" : "Reveal genuine mathematical derivation stages"}</small>
+          </button>
+
+          {showCalculationTrace && (
+            <div className="calc-derivation-tray">
+              {inspSystem === "caesar" && (
+                <div className="calc-trace-mini-table">
+                  <table className="calculation-table">
+                    <thead>
+                      <tr>
+                        <th>Input Char</th>
+                        <th>x</th>
+                        <th>Calculation: (x + {inspShift}) mod 26</th>
+                        <th>Cipher Char</th>
+                        <th>Decryption: (y - {inspShift}) mod 26</th>
+                        <th>Recovered</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    </thead>
+                    <tbody>
+                      {inspInput
+                        .toUpperCase()
+                        .split("")
+                        .filter((c) => /^[A-Z]$/.test(c))
+                        .slice(0, 8)
+                        .map((c, idx) => {
+                          const x = c.charCodeAt(0) - 65;
+                          const y = (x + inspShift) % 26;
+                          const rec = (y - inspShift + 26) % 26;
+                          return (
+                            <tr key={idx}>
+                              <td><strong>{c}</strong></td>
+                              <td>{x}</td>
+                              <td><code>({x} + {inspShift}) mod 26 = {y}</code></td>
+                              <td><strong>{ALPHABET[y]}</strong></td>
+                              <td><code>({y} - {inspShift}) mod 26 = {rec}</code></td>
+                              <td><span className="badge-yes">{ALPHABET[rec]}</span></td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-          {inspSystem === "affine" && (
-            <div className="calc-trace-mini-table">
-              <table className="calculation-table">
-                <thead>
-                  <tr>
-                    <th>Plain Char</th>
-                    <th>x</th>
-                    <th>Forward: ({inspAffineA}·x + {inspAffineB}) mod 26</th>
-                    <th>Cipher Char</th>
-                    <th>Inverse: {modularInverse(inspAffineA)}·(y - {inspAffineB}) mod 26</th>
-                    <th>Recovered</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inspInput.toUpperCase().split("").filter((c) => /^[A-Z]$/.test(c)).slice(0, 6).map((c, idx) => {
-                    const x = c.charCodeAt(0) - 65;
-                    const aInv = modularInverse(inspAffineA);
-                    const y = (inspAffineA * x + inspAffineB) % 26;
-                    const diff = y - inspAffineB;
-                    const rec = (((aInv * diff) % 26) + 26) % 26;
-                    return (
-                      <tr key={idx}>
-                        <td><strong>{c}</strong></td>
-                        <td>{x}</td>
-                        <td><code>({inspAffineA} × {x} + {inspAffineB}) = {inspAffineA * x + inspAffineB} mod 26 = {y}</code></td>
-                        <td><strong>{ALPHABET[y]}</strong></td>
-                        <td><code>{aInv} × ({y} - {inspAffineB}) = {aInv * diff} mod 26 = {rec}</code></td>
-                        <td><span className="badge-yes">{ALPHABET[rec]}</span></td>
+              {inspSystem === "affine" && (
+                <div className="calc-trace-mini-table">
+                  <table className="calculation-table">
+                    <thead>
+                      <tr>
+                        <th>Input Char</th>
+                        <th>x</th>
+                        <th>Forward: ({inspAffineA}x + {inspAffineB}) mod 26</th>
+                        <th>Cipher Char</th>
+                        <th>Inverse: {modularInverse(inspAffineA, MODULUS)}·(y - {inspAffineB}) mod 26</th>
+                        <th>Recovered</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    </thead>
+                    <tbody>
+                      {inspInput
+                        .toUpperCase()
+                        .split("")
+                        .filter((c) => /^[A-Z]$/.test(c))
+                        .slice(0, 8)
+                        .map((c, idx) => {
+                          const x = c.charCodeAt(0) - 65;
+                          const aInv = modularInverse(inspAffineA, MODULUS);
+                          const y = (inspAffineA * x + inspAffineB) % 26;
+                          const diff = y - inspAffineB;
+                          const rec = (((aInv * diff) % 26) + 26) % 26;
+                          return (
+                            <tr key={idx}>
+                              <td><strong>{c}</strong></td>
+                              <td>{x}</td>
+                              <td><code>({inspAffineA} × {x} + {inspAffineB}) mod 26 = {y}</code></td>
+                              <td><strong>{ALPHABET[y]}</strong></td>
+                              <td><code>{aInv} × ({y} - {inspAffineB}) mod 26 = {rec}</code></td>
+                              <td><span className="badge-yes">{ALPHABET[rec]}</span></td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-          {inspSystem === "permutation" && (
-            <div className="perm-trace-blocks">
-              <p>
-                Permutation applied across 4-character blocks under key {permutationLabel(S4[inspPermIndex])}:
-              </p>
-              <div className="perm-blocks-list">
-                {inspInput.toUpperCase().replace(/[^A-Z]/g, "").match(/.{1,4}/g)?.map((blk, idx) => {
-                  if (blk.length < 4) {
-                    return (
-                      <div key={idx} className="perm-block-item partial">
-                        <span>Block {idx + 1} ({blk}): Incomplete block &lt; 4 chars preserved unchanged.</span>
-                      </div>
-                    );
-                  }
-                  const outBlk = permutationApply(S4[inspPermIndex], blk);
-                  const recBlk = permutationApply(permutationInverse(S4[inspPermIndex]), outBlk);
-                  return (
-                    <div key={idx} className="perm-block-item">
-                      <span className="blk-tag">BLOCK {idx + 1}</span>
-                      <span className="blk-in">{blk}</span>
-                      <span className="blk-arr">→ P →</span>
-                      <span className="blk-out">{outBlk}</span>
-                      <span className="blk-arr">→ P⁻¹ →</span>
-                      <span className="blk-rec">{recBlk}</span>
-                      <span className="badge-yes">✓ Restored</span>
-                    </div>
-                  );
-                })}
-              </div>
+              {inspSystem === "permutation" && (
+                <div className="perm-trace-blocks">
+                  <p>
+                    Permutation key {permutationLabel(S4[inspPermIndex])} applied across fixed 4-character blocks:
+                  </p>
+                  <div className="perm-blocks-list">
+                    {inspInput
+                      .toUpperCase()
+                      .replace(/[^A-Z]/g, "")
+                      .match(/.{1,4}/g)
+                      ?.map((blk, idx) => {
+                        if (blk.length < 4) {
+                          return (
+                            <div key={idx} className="perm-block-item partial">
+                              <span>Block {idx + 1} ({blk}): Incomplete block &lt; 4 characters preserved unpermuted.</span>
+                            </div>
+                          );
+                        }
+                        const outBlk = permutationApply(S4[inspPermIndex], blk);
+                        const recBlk = permutationApply(permutationInverse(S4[inspPermIndex]), outBlk);
+                        return (
+                          <div key={idx} className="perm-block-item">
+                            <span className="blk-tag">BLOCK {idx + 1}</span>
+                            <span className="blk-in">{blk}</span>
+                            <span className="blk-arr">→ P →</span>
+                            <span className="blk-out">{outBlk}</span>
+                            <span className="blk-arr">→ P⁻¹ →</span>
+                            <span className="blk-rec">{recBlk}</span>
+                            <span className="badge-yes">✓ Restored</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </section>
 
       {/* ===================================================================== */}
-      {/* EXPERIMENT 3: COMPOSITION AND COMMUTATIVITY LAB                       */}
+      {/* EXPERIMENT 3: COMPOSITION & COMMUTATIVITY LAB                         */}
       {/* ===================================================================== */}
-      <section className="experiment-card-module" id="exp-commutativity-lab">
+      <section className="experiment-card-module" id="exp-composition">
         <div className="exp-module-header">
           <div className="exp-meta-badge">
             <span>EXPERIMENT 03</span>
@@ -900,30 +1068,25 @@ export function ExperimentsLab() {
 
           <div className="exp-guide-grid">
             <div className="guide-box">
-              <span className="guide-q">WHAT AM I TESTING?</span>
+              <span className="guide-q">1. QUESTION</span>
+              <p>Does changing the order of two transformations change the result?</p>
+            </div>
+            <div className="guide-box">
+              <span className="guide-q">2. CONVENTION</span>
               <p>
-                Does transformation order matter? Compare <MathView math="T_2 \circ T_1" /> (apply <MathView math="T_1" /> first)
-                against <MathView math="T_1 \circ T_2" /> (apply <MathView math="T_2" /> first).
+                <MathView math="(T_2 \circ T_1)(x) = T_2(T_1(x))" />: the rightmost transformation <MathView math="T_1" /> is applied first.
               </p>
             </div>
             <div className="guide-box">
-              <span className="guide-q">WHAT SHOULD I LOOK AT?</span>
+              <span className="guide-q">3. CRITERION</span>
               <p>
-                The two parallel routes. In an abelian group, both routes arrive at the exact same outcome.
-                In a non-abelian group, intermediate and final results diverge.
-              </p>
-            </div>
-            <div className="guide-box">
-              <span className="guide-q">WHAT DOES IT MEAN MATHEMATICALLY?</span>
-              <p>
-                Two transformations commute if and only if <MathView math="T_2 \circ T_1 = T_1 \circ T_2" />.
-                Caesar shifts always commute. Affine maps and position permutations do not commute in general.
+                Two transformations commute if and only if <MathView math="T_2 \circ T_1 = T_1 \circ T_2" /> over the entire domain.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Commutativity Controls & Presets */}
+        {/* 17. Presets & Controls */}
         <div className="comm-lab-controls">
           <div className="system-pill-selector">
             <button
@@ -933,6 +1096,7 @@ export function ExperimentsLab() {
                 setCommLabSystem("caesar");
                 setCommCaesarK1(3);
                 setCommCaesarK2(7);
+                setCommTestString("ALGEBRA");
               }}
             >
               Caesar (Abelian)
@@ -946,6 +1110,7 @@ export function ExperimentsLab() {
                 setCommAffineB1(2);
                 setCommAffineA2(5);
                 setCommAffineB2(7);
+                setCommTestString("MATH");
               }}
             >
               Affine (Non-Abelian)
@@ -966,7 +1131,7 @@ export function ExperimentsLab() {
 
           <div className="comm-param-tuning">
             <label>
-              <span>Test input:</span>
+              <span>Test Input:</span>
               <input
                 type="text"
                 value={commTestString}
@@ -1058,52 +1223,57 @@ export function ExperimentsLab() {
           </div>
         </div>
 
-        {/* Dynamic Verdict Banner */}
+        {/* 16. Dynamic Verdict Banner */}
         <div className={`comm-verdict-banner ${commEvaluation.isCommutative ? "commutative" : "non-commutative"}`}>
           <div className="verdict-headline">
-            {commEvaluation.isCommutative ? (
-              <>
-                <span className="verdict-icon">✓</span>
-                <strong>COMMUTATIVE: T₂ ∘ T₁ = T₁ ∘ T₂</strong>
-              </>
-            ) : (
-              <>
-                <span className="verdict-icon">≠</span>
-                <strong>NON-COMMUTATIVE: T₂ ∘ T₁ ≠ T₁ ∘ T₂</strong>
-              </>
-            )}
+            <span className="verdict-icon">{commEvaluation.isCommutative ? "✓" : "≠"}</span>
+            <strong>
+              {commEvaluation.isCommutative
+                ? "The transformations commute — (T₂ ∘ T₁ = T₁ ∘ T₂)"
+                : "The transformations do not commute — (T₂ ∘ T₁ ≠ T₁ ∘ T₂)"}
+            </strong>
           </div>
           <p>{commEvaluation.summary}</p>
+          <div className="domain-proof-note">
+            <span>Domain Check:</span> {commEvaluation.domainProof}
+          </div>
+          {commEvaluation.counterExample && (
+            <div className="counter-example-badge">
+              <strong>Concrete Counterexample:</strong> For input <code>&quot;{commEvaluation.counterExample.input}&quot;</code>,
+              Path A produces <code>&quot;{commEvaluation.counterExample.outA}&quot;</code> while
+              Path B produces <code>&quot;{commEvaluation.counterExample.outB}&quot;</code>.
+            </div>
+          )}
         </div>
 
-        {/* Parallel Routes Comparison */}
+        {/* 15. Parallel Visual Pipelines: Path A vs Path B */}
         <div className="parallel-routes-grid">
-          {/* Route A */}
+          {/* Path A */}
           <div className="route-card">
             <div className="route-head">
-              <span className="route-tag">ROUTE A: T₂ ∘ T₁</span>
+              <span className="route-tag">PATH A: T₂ ∘ T₁</span>
               <strong>Apply T₁ first, then T₂</strong>
             </div>
 
             <div className="route-steps">
               <div className="route-step">
-                <span className="step-label">INPUT</span>
+                <span className="step-label">INPUT (x)</span>
                 <span className="step-val">{commTestString}</span>
               </div>
               <span className="route-arr">↓ [Step 1: T₁]</span>
               <div className="route-step">
                 <span className="step-label">INTERMEDIATE T₁(x)</span>
-                <span className="step-val mid">{commEvaluation.routeA.mid}</span>
+                <span className="step-val mid">{commEvaluation.pathA.mid}</span>
               </div>
               <span className="route-arr">↓ [Step 2: T₂]</span>
               <div className="route-step final">
-                <span className="step-label">FINAL OUTPUT</span>
-                <strong className="step-val">{commEvaluation.routeA.final}</strong>
+                <span className="step-label">FINAL OUTPUT T₂(T₁(x))</span>
+                <strong className="step-val">{commEvaluation.pathA.final}</strong>
               </div>
             </div>
 
             <div className="route-formula-box">
-              <MathView math={commEvaluation.routeA.formula} display />
+              <MathView math={commEvaluation.pathA.formula} display />
             </div>
           </div>
 
@@ -1111,32 +1281,125 @@ export function ExperimentsLab() {
             <span>VS</span>
           </div>
 
-          {/* Route B */}
+          {/* Path B */}
           <div className="route-card">
             <div className="route-head">
-              <span className="route-tag">ROUTE B: T₁ ∘ T₂</span>
+              <span className="route-tag">PATH B: T₁ ∘ T₂</span>
               <strong>Apply T₂ first, then T₁</strong>
             </div>
 
             <div className="route-steps">
               <div className="route-step">
-                <span className="step-label">INPUT</span>
+                <span className="step-label">INPUT (x)</span>
                 <span className="step-val">{commTestString}</span>
               </div>
               <span className="route-arr">↓ [Step 1: T₂]</span>
               <div className="route-step">
                 <span className="step-label">INTERMEDIATE T₂(x)</span>
-                <span className="step-val mid">{commEvaluation.routeB.mid}</span>
+                <span className="step-val mid">{commEvaluation.pathB.mid}</span>
               </div>
               <span className="route-arr">↓ [Step 2: T₁]</span>
               <div className="route-step final">
-                <span className="step-label">FINAL OUTPUT</span>
-                <strong className="step-val">{commEvaluation.routeB.final}</strong>
+                <span className="step-label">FINAL OUTPUT T₁(T₂(x))</span>
+                <strong className="step-val">{commEvaluation.pathB.final}</strong>
               </div>
             </div>
 
             <div className="route-formula-box">
-              <MathView math={commEvaluation.routeB.formula} display />
+              <MathView math={commEvaluation.pathB.formula} display />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===================================================================== */}
+      {/* EXPERIMENT 4: BRUTE-FORCE A SHIFT & OBSERVATION LOG                   */}
+      {/* ===================================================================== */}
+      <section className="experiment-card-module" id="exp-bruteforce">
+        <div className="exp-module-header">
+          <div className="exp-meta-badge">
+            <span>EXPERIMENT 04</span>
+            <span className="badge-tag">EXHAUSTIVE ENUMERATION</span>
+          </div>
+          <h2 className="exp-module-title">Brute-Force Enumeration &amp; Observation Log</h2>
+          <p className="exp-module-sub">
+            Because Caesar shifts form a finite cyclic group of order 26, any ciphertext can be completely enumerated across all candidate keys.
+          </p>
+        </div>
+
+        <div className="experiment-grid">
+          {/* Brute Force Panel */}
+          <div className="panel brute-force">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">CANDIDATE KEYS ENUMERATION</p>
+                <h3>Brute-force a shift</h3>
+              </div>
+              <span className="result-badge">26 KEYS</span>
+            </div>
+
+            <input
+              className="experiment-input"
+              value={bruteCipher}
+              onChange={(e) => setBruteCipher(e.target.value)}
+              aria-label="Ciphertext to brute force"
+              placeholder="Enter ciphertext to decrypt..."
+            />
+
+            <div className="guesses-list">
+              {bruteGuesses.map((guess) => (
+                <button
+                  type="button"
+                  className={bruteSelectedKey === guess.key ? "guess selected" : "guess"}
+                  key={guess.key}
+                  onClick={() => setBruteSelectedKey(guess.key)}
+                >
+                  <span>k = {guess.key}</span>
+                  <strong>{guess.text}</strong>
+                  <i>↗</i>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Observations Panel */}
+          <div className="panel observations">
+            <p className="eyebrow">OBSERVATION LOG</p>
+            <div className="observation">
+              <span>01</span>
+              <p>
+                <b>Enumeration is finite.</b> A key space of 26 is trivial to search exhaustively on any computer in microseconds.
+              </p>
+            </div>
+            <div className="observation">
+              <span>02</span>
+              <p>
+                <b>Structure explains the cycle.</b> Shift 3 has order {bruteOrder}; repeated application modulo 26 returns to the identity shift.
+              </p>
+            </div>
+            <div className="observation">
+              <span>03</span>
+              <p>
+                <b>Key space size does not equal security.</b> Even with 312 affine keys or 24 permutations, finite classical ciphers lack diffusion and computational complexity.
+              </p>
+            </div>
+
+            <div className="frequency">
+              <span className="eyebrow">LETTER FREQUENCY SIGNATURE</span>
+              <div>
+                {ALPHABET.slice(0, 5).split("").map((letter) => {
+                  const count = (bruteCipher.toUpperCase().match(new RegExp(letter, "g")) || []).length;
+                  return (
+                    <div key={letter}>
+                      <b>{letter}</b>
+                      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", height: 5 }}>
+                        <i style={{ width: `${Math.min(count * 20, 100)}%`, height: "100%", background: "var(--lav)", display: "block" }} />
+                      </div>
+                      <span>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

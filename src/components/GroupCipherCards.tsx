@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 export type SystemCipher = "caesar" | "affine" | "permutation";
@@ -52,28 +52,56 @@ const CIPHER_CARDS: CipherCardData[] = [
 
 export function GroupCipherCards() {
   const [activeCipher, setActiveCipher] = useState<SystemCipher | null>(null);
+  const triggerRefs = useRef<Record<SystemCipher, HTMLButtonElement | null>>({
+    caesar: null,
+    affine: null,
+    permutation: null,
+  });
 
-  const toggleCipher = (cipher: SystemCipher) => {
-    setActiveCipher((current) => (current === cipher ? null : cipher));
+  // Handle Escape key to close dialog
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && activeCipher !== null) {
+        const prevCipher = activeCipher;
+        setActiveCipher(null);
+        triggerRefs.current[prevCipher]?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeCipher]);
+
+  const openCipher = (cipher: SystemCipher) => {
+    setActiveCipher(cipher);
+  };
+
+  const closeCipher = () => {
+    const prevCipher = activeCipher;
+    setActiveCipher(null);
+    if (prevCipher) {
+      triggerRefs.current[prevCipher]?.focus();
+    }
   };
 
   return (
     <div className="group-cipher-systems">
+      {/* Summary Cards Grid — Stays stable in layout without in-flow expansion */}
       <div className="cipher-cards-grid" role="region" aria-label="Transformation System Cards">
         {CIPHER_CARDS.map((card) => {
-          const isExpanded = activeCipher === card.id;
           return (
             <div
               key={card.id}
-              className={`cipher-card-item ${card.colorClass} ${isExpanded ? "expanded" : ""}`}
+              className={`cipher-card-item ${card.colorClass}`}
             >
               <button
                 type="button"
-                className={`cipher-card-trigger ${card.colorClass} ${isExpanded ? "active" : ""}`}
-                onClick={() => toggleCipher(card.id)}
-                aria-expanded={isExpanded}
-                aria-controls={`cipher-panel-${card.id}`}
-                id={`cipher-card-${card.id}`}
+                ref={(el) => { triggerRefs.current[card.id] = el; }}
+                className={`cipher-card-trigger ${card.colorClass}`}
+                onClick={() => openCipher(card.id)}
+                aria-haspopup="dialog"
+                aria-expanded={activeCipher === card.id}
+                aria-controls={`cipher-dialog-${card.id}`}
+                id={`cipher-card-trigger-${card.id}`}
               >
                 <div className="cipher-card-header">
                   <span className="cipher-card-number">{card.number}</span>
@@ -85,12 +113,8 @@ export function GroupCipherCards() {
                   <p className="cipher-card-desc">{card.summary}</p>
                 </div>
                 <div className="cipher-card-footer">
-                  <span className="more-info-label">
-                    {isExpanded ? "Close details" : "More information"}
-                  </span>
-                  <span className="more-info-icon" aria-hidden="true">
-                    {isExpanded ? "▲" : "▼"}
-                  </span>
+                  <span className="more-info-label">Inspect group details</span>
+                  <span className="more-info-icon" aria-hidden="true">↗</span>
                 </div>
               </button>
             </div>
@@ -98,23 +122,31 @@ export function GroupCipherCards() {
         })}
       </div>
 
-      <AnimatePresence mode="wait">
+      {/* Accessible Modal Dialog — Independent of the card grid layout */}
+      <AnimatePresence>
         {activeCipher && (
-          <motion.div
-            key={activeCipher}
-            id={`cipher-panel-${activeCipher}`}
-            role="region"
-            aria-labelledby={`cipher-card-${activeCipher}`}
-            className={`cipher-detail-panel in-flow ${activeCipher}`}
-            initial={{ opacity: 0, height: 0, y: -8 }}
-            animate={{ opacity: 1, height: "auto", y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -8 }}
-            transition={{ duration: 0.28, ease: "easeOut" }}
+          <div
+            className="cipher-modal-backdrop"
+            onClick={closeCipher}
+            role="presentation"
           >
-            {activeCipher === "caesar" && <CaesarDetailPanel onClose={() => setActiveCipher(null)} />}
-            {activeCipher === "affine" && <AffineDetailPanel onClose={() => setActiveCipher(null)} />}
-            {activeCipher === "permutation" && <PermutationDetailPanel onClose={() => setActiveCipher(null)} />}
-          </motion.div>
+            <motion.div
+              id={`cipher-dialog-${activeCipher}`}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={`cipher-dialog-title-${activeCipher}`}
+              className={`cipher-dialog-container ${activeCipher}`}
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.96, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 14 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              {activeCipher === "caesar" && <CaesarDetailPanel onClose={closeCipher} />}
+              {activeCipher === "affine" && <AffineDetailPanel onClose={closeCipher} />}
+              {activeCipher === "permutation" && <PermutationDetailPanel onClose={closeCipher} />}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -122,15 +154,22 @@ export function GroupCipherCards() {
 }
 
 function CaesarDetailPanel({ onClose }: { onClose: () => void }) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
   return (
     <div className="cipher-panel-content">
       <div className="panel-top-bar">
         <span className="panel-badge violet">SYSTEM 01 / CYCLIC GROUP C₂₆</span>
         <button
+          ref={closeButtonRef}
           type="button"
           className="panel-close-btn"
           onClick={onClose}
-          aria-label="Close Caesar cipher details"
+          aria-label="Close Caesar cipher details dialog"
         >
           ✕
         </button>
@@ -139,7 +178,7 @@ function CaesarDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 1. Heading */}
       <div className="panel-section">
         <span className="section-step-num">01 / HEADING</span>
-        <h2 className="panel-main-title">Caesar Cipher — Cyclic Group C₂₆</h2>
+        <h2 id="cipher-dialog-title-caesar" className="panel-main-title">Caesar Cipher — Cyclic Group C₂₆</h2>
         <p className="panel-subtitle">
           Uniform modular translation over the ring of integers modulo 26
         </p>
@@ -339,7 +378,7 @@ function CaesarDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 7. Conclusion */}
       <div className="panel-section conclusion-section">
         <span className="section-step-num">07 / CONCLUSION</span>
-        <h3 className="section-title">Algebraic Structure & Group Insights</h3>
+        <h3 className="section-title">Algebraic Structure &amp; Group Insights</h3>
         <p className="panel-paragraph">
           The worked example demonstrates that the Caesar transformation is completely reversible because every element in the cyclic group <code>C₂₆</code> possesses a unique algebraic inverse under addition modulo 26.
         </p>
@@ -352,15 +391,22 @@ function CaesarDetailPanel({ onClose }: { onClose: () => void }) {
 }
 
 function AffineDetailPanel({ onClose }: { onClose: () => void }) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
   return (
     <div className="cipher-panel-content">
       <div className="panel-top-bar">
         <span className="panel-badge blue">SYSTEM 02 / GENERAL AFFINE GROUP AGL(1, 26)</span>
         <button
+          ref={closeButtonRef}
           type="button"
           className="panel-close-btn"
           onClick={onClose}
-          aria-label="Close Affine cipher details"
+          aria-label="Close Affine cipher details dialog"
         >
           ✕
         </button>
@@ -369,7 +415,7 @@ function AffineDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 1. Heading */}
       <div className="panel-section">
         <span className="section-step-num">01 / HEADING</span>
-        <h2 className="panel-main-title">Affine Cipher — AGL(1, 26)</h2>
+        <h2 id="cipher-dialog-title-affine" className="panel-main-title">Affine Cipher — AGL(1, 26)</h2>
         <p className="panel-subtitle">
           Invertible affine transformations over the residue classes modulo 26
         </p>
@@ -389,13 +435,13 @@ function AffineDetailPanel({ onClose }: { onClose: () => void }) {
         <p className="panel-paragraph">
           For the transformation to be a bijective permutation (and thus reversible), the multiplier{" "}
           <code>a</code> must belong to the group of units <code>ℤ₂₆ˣ</code>, which requires{" "}
-          <code>gcd(a, 26) = 1</code>. By Euler's totient function,{" "}
+          <code>gcd(a, 26) = 1</code>. By Euler&apos;s totient function,{" "}
           <code>φ(26) = φ(2)φ(13) = 1 × 12 = 12</code> valid multipliers exist:{" "}
           <code>&#123;1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25&#125;</code>.
         </p>
         <p className="panel-paragraph">
           Together with the 26 possible choices for <code>b ∈ &#123;0, 1, …, 25&#125;</code>, there are exactly{" "}
-          <code>12 × 26 = 312</code> invertible affine maps. Under function composition, these forms the
+          <code>12 × 26 = 312</code> invertible affine maps. Under function composition, these form the
           affine general linear group <code>AGL(1, 26)</code>. Composition of affine maps is non-commutative:{" "}
           <code>E_(a₁, b₁) ∘ E_(a₂, b₂) ≠ E_(a₂, b₂) ∘ E_(a₁, b₁)</code> in general.
         </p>
@@ -485,7 +531,7 @@ function AffineDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 5. Decryption formula */}
       <div className="panel-section">
         <span className="section-step-num">05 / DECRYPTION FORMULA</span>
-        <h3 className="section-title">Decryption Function & Modular Inverse</h3>
+        <h3 className="section-title">Decryption Function &amp; Modular Inverse</h3>
         <div className="formula-box">
           <code>D_(a, b)(y) = a⁻¹(y - b) mod 26</code>
         </div>
@@ -576,7 +622,7 @@ function AffineDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 7. Conclusion */}
       <div className="panel-section conclusion-section">
         <span className="section-step-num">07 / CONCLUSION</span>
-        <h3 className="section-title">Algebraic Structure & Group Insights</h3>
+        <h3 className="section-title">Algebraic Structure &amp; Group Insights</h3>
         <p className="panel-paragraph">
           The worked example proves that the affine transformation is reversible if and only if the multiplier <code>a</code> is invertible modulo 26. When <code>gcd(a, 26) = 1</code>, the mapping is guaranteed to be a bijection, preserving reversibility across the entire alphabet.
         </p>
@@ -589,15 +635,22 @@ function AffineDetailPanel({ onClose }: { onClose: () => void }) {
 }
 
 function PermutationDetailPanel({ onClose }: { onClose: () => void }) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
   return (
     <div className="cipher-panel-content">
       <div className="panel-top-bar">
         <span className="panel-badge silver">SYSTEM 03 / SYMMETRIC GROUP S₄</span>
         <button
+          ref={closeButtonRef}
           type="button"
           className="panel-close-btn"
           onClick={onClose}
-          aria-label="Close S₄ permutation cipher details"
+          aria-label="Close S₄ permutation cipher details dialog"
         >
           ✕
         </button>
@@ -606,7 +659,7 @@ function PermutationDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 1. Heading */}
       <div className="panel-section">
         <span className="section-step-num">01 / HEADING</span>
-        <h2 className="panel-main-title">Position Permutation Cipher — S₄</h2>
+        <h2 id="cipher-dialog-title-permutation" className="panel-main-title">Position Permutation Cipher — S₄</h2>
         <p className="panel-subtitle">
           Permutation of four letter positions under the symmetric group S₄
         </p>
@@ -633,7 +686,7 @@ function PermutationDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 3. Encryption formula */}
       <div className="panel-section">
         <span className="section-step-num">03 / ENCRYPTION FORMULA</span>
-        <h3 className="section-title">Permutation Convention & Function</h3>
+        <h3 className="section-title">Permutation Convention &amp; Function</h3>
         <p className="panel-paragraph">
           Following the established repository convention, a one-based key <code>[p₁, p₂, p₃, p₄]</code> specifies that <strong>output position i receives the input letter from position pᵢ</strong>.
         </p>
@@ -782,7 +835,7 @@ function PermutationDetailPanel({ onClose }: { onClose: () => void }) {
       {/* 7. Conclusion */}
       <div className="panel-section conclusion-section">
         <span className="section-step-num">07 / CONCLUSION</span>
-        <h3 className="section-title">Algebraic Structure & Group Insights</h3>
+        <h3 className="section-title">Algebraic Structure &amp; Group Insights</h3>
         <p className="panel-paragraph">
           Each block permutation is reversible because every element in the symmetric group <code>S₄</code> possesses a unique two-sided inverse permutation. Applying the inverse permutation restores the source ordering without ambiguity.
         </p>
