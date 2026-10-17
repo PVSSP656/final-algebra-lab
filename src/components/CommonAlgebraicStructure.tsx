@@ -1,2084 +1,1794 @@
 import { useState, useMemo, useEffect } from "react";
 import { MathView } from "./MathView";
+import { TransformationChamber } from "./TransformationChamber";
 import {
   ALPHABET,
-  MODULUS,
   AFFINE_UNITS,
   S4,
   gcd,
-  modularInverse,
   caesarValue,
+  caesarText,
   affineValue,
   affineCompose,
   affineInverse,
+  affineText,
   permutationApply,
   permutationCompose,
   permutationInverse,
   permutationLabel,
+  permutationText,
   type AffineKey,
   type Permutation,
 } from "../math/engine";
 
-type SectionTab = "overview" | "reversible" | "axioms" | "composition" | "compare" | "limits";
+// ─── Section scroll navigation ──────────────────────────────────────────────
+
+type SectionTab = "overview" | "reversible" | "axioms" | "composition" | "compare" | "takeaway";
+
+function scrollTo(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.pageYOffset - 88;
+  window.scrollTo({ top, behavior: "smooth" });
+}
+
+// ─── Small shared UI pieces ──────────────────────────────────────────────────
+
+function SectionEyebrow({ label }: { label: string }) {
+  return <div className="s-eyebrow">{label}</div>;
+}
+
+function ExpandToggle({
+  open,
+  onToggle,
+  label = "Show formal definition",
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label?: string;
+}) {
+  return (
+    <button type="button" className="expand-toggle" onClick={onToggle}>
+      {open ? "↑ Hide" : `↓ ${label}`}
+    </button>
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
 
 export function CommonAlgebraicStructure() {
   const [activeSection, setActiveSection] = useState<SectionTab>("overview");
 
-  const handleSectionNavigate = (tab: SectionTab) => {
-    setActiveSection(tab);
-    const sectionMap: Record<SectionTab, string> = {
-      overview: "section-overview",
-      reversible: "section-reversibility",
-      axioms: "section-axioms",
-      composition: "section-composition",
-      compare: "section-compare",
-      limits: "section-limits",
-    };
-    const targetId = sectionMap[tab];
-    const targetElem = document.getElementById(targetId);
-    if (targetElem) {
-      const headerOffset = 96;
-      const elementPosition = targetElem.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
-      });
-    }
-  };
-
+  // Scroll spy
   useEffect(() => {
-    const sectionMap: Record<string, SectionTab> = {
-      "section-overview": "overview",
-      "section-reversibility": "reversible",
-      "section-axioms": "axioms",
-      "section-composition": "composition",
-      "section-compare": "compare",
-      "section-limits": "limits",
-    };
-    const observer = new IntersectionObserver(
+    const ids: [string, SectionTab][] = [
+      ["sec-overview", "overview"],
+      ["sec-reversible", "reversible"],
+      ["sec-axioms", "axioms"],
+      ["sec-composition", "composition"],
+      ["sec-compare", "compare"],
+      ["sec-takeaway", "takeaway"],
+    ];
+    const obs = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const tab = sectionMap[entry.target.id];
-            if (tab) {
-              setActiveSection(tab);
-            }
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            const found = ids.find(([id]) => id === e.target.id);
+            if (found) setActiveSection(found[1]);
           }
         }
       },
-      {
-        rootMargin: "-100px 0px -60% 0px",
-        threshold: 0.1,
-      }
+      { rootMargin: "-100px 0px -55% 0px", threshold: 0.05 }
     );
-    Object.keys(sectionMap).forEach((id) => {
+    ids.forEach(([id]) => {
       const el = document.getElementById(id);
-      if (el) observer.observe(el);
+      if (el) obs.observe(el);
     });
-    return () => observer.disconnect();
+    return () => obs.disconnect();
   }, []);
 
-  // SECTION A: Interactive demo state for three panels
-  const [sectionAView, setSectionAView] = useState<"all" | "caesar" | "affine" | "permutation">("all");
-  const [caesarShiftA, setCaesarShiftA] = useState(3);
-  const [caesarFocusLetterA, setCaesarFocusLetterA] = useState(23); // 'X' (23) -> wraps around with shift 3
-  const [affineInputA, setAffineInputA] = useState("M");
-  const [affineMultiplierA, setAffineMultiplierA] = useState(5);
-  const [affineShiftA, setAffineShiftA] = useState(8);
-  const [permKeyIndexA, setPermKeyIndexA] = useState(13); // [3, 1, 4, 2]
-  const [permBlockA, setPermBlockA] = useState("ABCD");
+  // ── Section B: Three Systems ──────────────────────────────────────────────
+  const [caesarWord, setCaesarWord] = useState("HELLO");
+  const [caesarK, setCaesarK] = useState(3);
+  const [affineWord, setAffineWord] = useState("HELLO");
+  const [affineA, setAffineA] = useState(5);
+  const [affineB, setAffineB] = useState(8);
+  const [permWord, setPermWord] = useState("MATH");
+  const [permKeyIdx, setPermKeyIdx] = useState(13); // [3,1,4,2]
 
-  // SECTION B: Reversibility & Bijectivity mode
-  const [bijectiveMode, setBijectiveMode] = useState<"bijective" | "non-bijective">("bijective");
-  const [revCaesarShift, setRevCaesarShift] = useState(5);
-  const [revCaesarChar, setRevCaesarChar] = useState("G");
-
-  // SECTION C: Axioms state
-  const [axiomSystem, setAxiomSystem] = useState<"caesar" | "affine" | "permutation">("caesar");
-  const [expandedAxiom, setExpandedAxiom] = useState<number | null>(null);
-
-  // SECTION D: Interactive composition visualizer state
-  const [demoSystem, setDemoSystem] = useState<"caesar" | "affine" | "permutation">("caesar");
-  const [caesarK1, setCaesarK1] = useState(3);
-  const [caesarK2, setCaesarK2] = useState(5);
-  const [caesarInput, setCaesarInput] = useState("H");
-
-  const [affineA1, setAffineA1] = useState(3);
-  const [affineB1, setAffineB1] = useState(4);
-  const [affineA2, setAffineA2] = useState(5);
-  const [affineB2, setAffineB2] = useState(7);
-  const [affineInput, setAffineInput] = useState("M");
-
-  const [permIdx1, setPermIdx1] = useState(2); // e.g. [1, 3, 2, 4]
-  const [permIdx2, setPermIdx2] = useState(6); // e.g. [2, 1, 3, 4]
-  const [permInput, setPermInput] = useState("MATH");
-
-  // Section E: Commutativity demo system
-  const [commSystem, setCommSystem] = useState<"caesar" | "affine" | "permutation">("affine");
-
-  // ---------------------------------------------------------------------------
-  // Calculations for Section A
-  // ---------------------------------------------------------------------------
-  // Caesar probe calculations
-  const caesarProbeVal = caesarFocusLetterA;
-  const caesarProbeChar = ALPHABET[caesarProbeVal];
-  const caesarProbeShiftedVal = (caesarProbeVal + caesarShiftA) % 26;
-  const caesarProbeShiftedChar = ALPHABET[caesarProbeShiftedVal];
-  const caesarWrapsAround = caesarProbeVal + caesarShiftA >= 26;
-
-  // Affine pipeline calculations
-  const affineValA = useMemo(() => {
-    const char = affineInputA.toUpperCase().slice(0, 1) || "A";
-    const x = char.charCodeAt(0) - 65;
-    return x >= 0 && x < 26 ? x : 0;
-  }, [affineInputA]);
-
-  const affineGcdVal = useMemo(() => gcd(affineMultiplierA, 26), [affineMultiplierA]);
-  const isAffineValid = affineGcdVal === 1;
-
-  const affineStepMultiply = affineMultiplierA * affineValA;
-  const affineStepAdd = affineStepMultiply + affineShiftA;
-  const affineStepMod = ((affineStepAdd % 26) + 26) % 26;
-  const affineOutputCharA = ALPHABET[affineStepMod];
-  const affineInvMult = useMemo(() => {
-    if (!isAffineValid) return null;
-    try {
-      return modularInverse(affineMultiplierA, 26);
-    } catch {
-      return null;
-    }
-  }, [affineMultiplierA, isAffineValid]);
-
-  // Permutation calculations for S4
-  const permKeyA = S4[permKeyIndexA] ?? S4[13]; // [2, 0, 3, 1] zero-indexed
-  const permCleanBlockA = useMemo(() => {
-    const clean = (permBlockA.toUpperCase().replace(/[^A-Z]/g, "") + "ABCD").slice(0, 4);
-    return clean;
-  }, [permBlockA]);
-  const permOutputBlockA = useMemo(() => {
-    return permutationApply(permKeyA, permCleanBlockA);
-  }, [permKeyA, permCleanBlockA]);
-
-  // ---------------------------------------------------------------------------
-  // Calculations for Section B: Reversible vs Non-bijective
-  // ---------------------------------------------------------------------------
-  const revInputVal = revCaesarChar.charCodeAt(0) - 65;
-  const revEncryptedVal = caesarValue(revInputVal, revCaesarShift);
-  const revEncryptedChar = ALPHABET[revEncryptedVal];
-  const revDecryptedVal = caesarValue(revEncryptedVal, -revCaesarShift);
-  const revDecryptedChar = ALPHABET[revDecryptedVal];
-
-  // Non-bijective example: f(x) = (2x) mod 26 (multiplier 2 has gcd(2, 26) = 2 != 1)
-  const nonBijectiveCollisions = useMemo(() => {
-    return [
-      { plainChar: "A", val: 0, calc: "(2 × 0) mod 26 = 0", cipherChar: "A" },
-      { plainChar: "N", val: 13, calc: "(2 × 13) mod 26 = 26 mod 26 = 0", cipherChar: "A" },
-      { plainChar: "B", val: 1, calc: "(2 × 1) mod 26 = 2", cipherChar: "C" },
-      { plainChar: "O", val: 14, calc: "(2 × 14) mod 26 = 28 mod 26 = 2", cipherChar: "C" },
-    ];
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // Calculations for Section D: Interactive Composition
-  // ---------------------------------------------------------------------------
-  // Caesar
-  const caesarVal = useMemo(() => {
-    const char = caesarInput.toUpperCase().slice(0, 1) || "A";
-    const x = char.charCodeAt(0) - 65;
-    return x >= 0 && x < 26 ? x : 0;
-  }, [caesarInput]);
-  const caesarChar = ALPHABET[caesarVal];
-  const caesarStep1Val = caesarValue(caesarVal, caesarK1);
-  const caesarStep1Char = ALPHABET[caesarStep1Val];
-  const caesarStep2Val = caesarValue(caesarStep1Val, caesarK2);
-  const caesarStep2Char = ALPHABET[caesarStep2Val];
-  const caesarCompK = (caesarK1 + caesarK2) % MODULUS;
-  const caesarDirectVal = caesarValue(caesarVal, caesarCompK);
-  const caesarDirectChar = ALPHABET[caesarDirectVal];
-  const caesarInvK = (MODULUS - caesarCompK) % MODULUS;
-  const caesarRecoveredVal = caesarValue(caesarStep2Val, caesarInvK);
-  const caesarRecoveredChar = ALPHABET[caesarRecoveredVal];
-
-  // Affine
-  const affineVal = useMemo(() => {
-    const char = affineInput.toUpperCase().slice(0, 1) || "A";
-    const x = char.charCodeAt(0) - 65;
-    return x >= 0 && x < 26 ? x : 0;
-  }, [affineInput]);
-  const affineChar = ALPHABET[affineVal];
-  const key1 = useMemo<AffineKey>(() => ({ a: affineA1, b: affineB1 }), [affineA1, affineB1]);
-  const key2 = useMemo<AffineKey>(() => ({ a: affineA2, b: affineB2 }), [affineA2, affineB2]);
-  const affineStep1Val = affineValue(affineVal, key1);
-  const affineStep1Char = ALPHABET[affineStep1Val];
-  const affineStep2Val = affineValue(affineStep1Val, key2);
-  const affineStep2Char = ALPHABET[affineStep2Val];
-  // Note: T2 o T1 has key2 applied second, key1 applied first
-  // affineCompose(first, second) computes first o second (second first, first second)
-  const affineCompKey = useMemo(
-    () => affineCompose({ a: affineA2, b: affineB2 }, { a: affineA1, b: affineB1 }),
-    [affineA1, affineB1, affineA2, affineB2]
+  const caesarOut = useMemo(
+    () => caesarText(caesarWord, caesarK),
+    [caesarWord, caesarK]
   );
-  const affineDirectVal = affineValue(affineVal, affineCompKey);
-  const affineDirectChar = ALPHABET[affineDirectVal];
-  const affineInvKey = useMemo(() => affineInverse(affineCompKey), [affineCompKey]);
-  const affineRecoveredVal = affineValue(affineStep2Val, affineInvKey);
-  const affineRecoveredChar = ALPHABET[affineRecoveredVal];
+  const affineGcd = useMemo(() => gcd(affineA, 26), [affineA]);
+  const isAffineValid = affineGcd === 1;
+  const affineOut = useMemo(() => {
+    if (!isAffineValid) return "—";
+    try { return affineText(affineWord, { a: affineA, b: affineB }); } catch { return "—"; }
+  }, [affineWord, affineA, affineB, isAffineValid]);
+  const permKey = S4[permKeyIdx] ?? S4[13];
+  const permCleanWord = useMemo(() => {
+    const raw = permWord.toUpperCase().replace(/[^A-Z]/g, "");
+    return (raw + "ABCD").slice(0, 4);
+  }, [permWord]);
+  const permOut = useMemo(
+    () => permutationText(permKey, permCleanWord),
+    [permKey, permCleanWord]
+  );
 
-  // Permutation
-  const permBlock = useMemo(() => {
-    const raw = permInput.toUpperCase().replace(/[^A-Z]/g, "");
-    return (raw + "WXYZ").slice(0, 4);
-  }, [permInput]);
-  const p1: Permutation = S4[permIdx1] ?? S4[0];
-  const p2: Permutation = S4[permIdx2] ?? S4[0];
-  const permStep1Block = permutationApply(p1, permBlock);
-  const permStep2Block = permutationApply(p2, permStep1Block);
-  // permutationCompose(p2, p1) calculates p2 o p1 (p1 first, p2 second)
-  const permComp = useMemo(() => permutationCompose(p2, p1), [p2, p1]);
-  const permDirectBlock = permutationApply(permComp, permBlock);
-  const permInv = useMemo(() => permutationInverse(permComp), [permComp]);
-  const permRecoveredBlock = permutationApply(permInv, permStep2Block);
+  // ── Section C: Reversibility ──────────────────────────────────────────────
+  const [revSystem, setRevSystem] = useState<"caesar" | "affine" | "permutation">("caesar");
+  const [revChar, setRevChar] = useState("G");
+  const [revK, setRevK] = useState(5);
+  const [revAffA, setRevAffA] = useState(5);
+  const [revAffB, setRevAffB] = useState(8);
+  const [revPermIdx, setRevPermIdx] = useState(13);
+  const [showCollision, setShowCollision] = useState(false);
 
-  // ---------------------------------------------------------------------------
-  // Section E: Commutativity calculation examples
-  // ---------------------------------------------------------------------------
-  // Affine preset: T1 = (3, 2), T2 = (5, 7)
-  const affTest1: AffineKey = { a: 3, b: 2 };
-  const affTest2: AffineKey = { a: 5, b: 7 };
-  const aff21 = affineCompose(affTest2, affTest1); // T2 o T1 = (15, 17)
-  const aff12 = affineCompose(affTest1, affTest2); // T1 o T2 = (15, 23)
+  const revPermKey = S4[revPermIdx] ?? S4[13];
 
-  // S4 preset: P = [2, 1, 3, 4] -> (1, 0, 2, 3), Q = [1, 3, 2, 4] -> (0, 2, 1, 3)
-  const pPreset: Permutation = [1, 0, 2, 3];
-  const qPreset: Permutation = [0, 2, 1, 3];
-  const pqPreset = permutationCompose(pPreset, qPreset); // P o Q (Q first) -> CABD
-  const qpPreset = permutationCompose(qPreset, pPreset); // Q o P (P first) -> BCAD
+  const revInput = useMemo(() => {
+    if (revSystem === "permutation") return "MATH";
+    return revChar;
+  }, [revSystem, revChar]);
+
+  const revEncrypted = useMemo(() => {
+    if (revSystem === "caesar") {
+      const v = revChar.charCodeAt(0) - 65;
+      return ALPHABET[caesarValue(v, revK)];
+    }
+    if (revSystem === "affine") {
+      if (!isAffineValid) return "?";
+      const v = revChar.charCodeAt(0) - 65;
+      return ALPHABET[affineValue(v, { a: revAffA, b: revAffB })];
+    }
+    return permutationApply(revPermKey, "MATH");
+  }, [revSystem, revChar, revK, revAffA, revAffB, revPermKey, isAffineValid]);
+
+  const revDecrypted = useMemo(() => {
+    if (revSystem === "caesar") {
+      const encV = (revEncrypted as string).charCodeAt(0) - 65;
+      return ALPHABET[caesarValue(encV, -revK)];
+    }
+    if (revSystem === "affine") {
+      if (!isAffineValid) return "?";
+      try {
+        const invKey = affineInverse({ a: revAffA, b: revAffB });
+        const encV = (revEncrypted as string).charCodeAt(0) - 65;
+        return ALPHABET[affineValue(encV, invKey)];
+      } catch { return "?"; }
+    }
+    const inv = permutationInverse(revPermKey);
+    return permutationApply(inv, revEncrypted as string);
+  }, [revSystem, revEncrypted, revK, revAffA, revAffB, revPermKey, isAffineValid]);
+
+  const revInverseLabel = useMemo(() => {
+    if (revSystem === "caesar") return `shift −${revK} (mod 26)`;
+    if (revSystem === "affine") {
+      try {
+        const inv = affineInverse({ a: revAffA, b: revAffB });
+        return `E(${inv.a},${inv.b})`;
+      } catch { return "—"; }
+    }
+    return permutationLabel(permutationInverse(revPermKey));
+  }, [revSystem, revK, revAffA, revAffB, revPermKey]);
+
+  // ── Section D: Group Axioms ───────────────────────────────────────────────
+  const [axiomSystem, setAxiomSystem] = useState<"caesar" | "affine" | "permutation">("caesar");
+  const [openAxiom, setOpenAxiom] = useState<number | null>(null);
+
+  const toggleAxiom = (n: number) => setOpenAxiom(openAxiom === n ? null : n);
+
+  // Axiom live examples (engine-computed)
+  // Closure example
+  const closureCaesar = { k1: 4, k2: 9, result: (4 + 9) % 26 };
+  const closureAffine = useMemo(() => {
+    const t1: AffineKey = { a: 3, b: 4 };
+    const t2: AffineKey = { a: 5, b: 7 };
+    return affineCompose(t2, t1);
+  }, []);
+  const closurePerm = useMemo(() => {
+    const p1 = S4[6]!; // [1,0,2,3] zero-indexed → label [2,1,3,4]
+    const p2 = S4[2]!; // [0,2,1,3] zero-indexed → label [1,3,2,4]
+    return { p1, p2, result: permutationCompose(p2, p1) };
+  }, []);
+
+  // Identity examples
+  // Inverse examples
+  const caesarInvK = 5;
+  const affineInvKey = useMemo(() => {
+    try { return affineInverse({ a: 5, b: 8 }); } catch { return null; }
+  }, []);
+
+  // ── Section E: Composition ────────────────────────────────────────────────
+  const [compSystem, setCompSystem] = useState<"caesar" | "affine" | "permutation">("caesar");
+  const [compInput, setCompInput] = useState("H");
+  const [compK1, setCompK1] = useState(3);
+  const [compK2, setCompK2] = useState(5);
+  const [compA1, setCompA1] = useState(3);
+  const [compB1, setCompB1] = useState(4);
+  const [compA2, setCompA2] = useState(5);
+  const [compB2, setCompB2] = useState(7);
+  const [compP1idx, setCompP1idx] = useState(13);
+  const [compP2idx, setCompP2idx] = useState(9);
+  const [compPermWord, setCompPermWord] = useState("MATH");
+  const [showCompMath, setShowCompMath] = useState(false);
+
+  const compInputVal = useMemo(() => {
+    const c = compInput.toUpperCase().slice(0, 1) || "A";
+    const v = c.charCodeAt(0) - 65;
+    return v >= 0 && v < 26 ? v : 0;
+  }, [compInput]);
+  const compInputChar = ALPHABET[compInputVal];
+
+  // Caesar path
+  const compCaesarStep1Val = caesarValue(compInputVal, compK1);
+  const compCaesarStep1Char = ALPHABET[compCaesarStep1Val];
+  const compCaesarStep2Val = caesarValue(compCaesarStep1Val, compK2);
+  const compCaesarStep2Char = ALPHABET[compCaesarStep2Val];
+  const compCaesarCompK = (compK1 + compK2) % 26;
+  const compCaesarInvK = (26 - compCaesarCompK) % 26;
+  const compCaesarRecovered = ALPHABET[caesarValue(compCaesarStep2Val, compCaesarInvK)];
+
+  // Affine path
+  const compAffKey1 = useMemo<AffineKey>(() => ({ a: compA1, b: compB1 }), [compA1, compB1]);
+  const compAffKey2 = useMemo<AffineKey>(() => ({ a: compA2, b: compB2 }), [compA2, compB2]);
+  const compAffStep1Val = affineValue(compInputVal, compAffKey1);
+  const compAffStep1Char = ALPHABET[compAffStep1Val];
+  const compAffStep2Val = affineValue(compAffStep1Val, compAffKey2);
+  const compAffStep2Char = ALPHABET[compAffStep2Val];
+  const compAffCompKey = useMemo(() => affineCompose(compAffKey2, compAffKey1), [compAffKey1, compAffKey2]);
+  const compAffInvKey = useMemo(() => affineInverse(compAffCompKey), [compAffCompKey]);
+  const compAffRecovered = ALPHABET[affineValue(compAffStep2Val, compAffInvKey)];
+
+  // Permutation path
+  const compP1 = S4[compP1idx] ?? S4[13];
+  const compP2 = S4[compP2idx] ?? S4[9];
+  const compPermClean = useMemo(() => {
+    const raw = compPermWord.toUpperCase().replace(/[^A-Z]/g, "");
+    return (raw + "ABCD").slice(0, 4);
+  }, [compPermWord]);
+  const compPermStep1 = useMemo(() => permutationApply(compP1, compPermClean), [compP1, compPermClean]);
+  const compPermStep2 = useMemo(() => permutationApply(compP2, compPermStep1), [compP2, compPermStep1]);
+  const compPermComp = useMemo(() => permutationCompose(compP2, compP1), [compP1, compP2]);
+  const compPermInv = useMemo(() => permutationInverse(compPermComp), [compPermComp]);
+  const compPermRecovered = useMemo(() => permutationApply(compPermInv, compPermStep2), [compPermInv, compPermStep2]);
+
+  // ── Section F: Compare (commutativity) ───────────────────────────────────
+  const [commSystem, setCommSystem] = useState<"caesar" | "affine" | "permutation">("caesar");
+
+  // Affine commutativity presets (engine-computed)
+  const affTest1: AffineKey = useMemo(() => ({ a: 3, b: 2 }), []);
+  const affTest2: AffineKey = useMemo(() => ({ a: 5, b: 7 }), []);
+  const aff21 = useMemo(() => affineCompose(affTest2, affTest1), [affTest1, affTest2]);
+  const aff12 = useMemo(() => affineCompose(affTest1, affTest2), [affTest1, affTest2]);
+
+  // S4 commutativity presets (engine-computed)
+  const pComm: Permutation = useMemo(() => [1, 0, 2, 3], []);
+  const qComm: Permutation = useMemo(() => [0, 2, 1, 3], []);
+  const pqComm = useMemo(() => permutationCompose(pComm, qComm), [pComm, qComm]);
+  const qpComm = useMemo(() => permutationCompose(qComm, pComm), [pComm, qComm]);
+
+  const commutes = commSystem === "caesar";
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="page-wrap structure-page">
-      {/* Page Header */}
-      <div className="page-intro">
+
+      {/* Page hero */}
+      <div className="page-intro struc-hero">
         <p className="eyebrow">04 / THE ALGEBRAIC STRUCTURES</p>
         <h1>
-          Reversibility through
-          <br />
+          Reversibility through<br />
           <em>algebraic groups.</em>
         </h1>
-        <p>
-          Transformations, bijections, and the four group axioms. Show the mathematics first,
-          interact with the transformations second, and inspect deeper definitions on demand.
+        <p className="struc-hero-sub">
+          Explore how three classical ciphers share one algebraic skeleton — invertible transformations under composition — and why that skeleton is called a <em>group</em>.
         </p>
       </div>
 
-      {/* Visual Navigation Tabs */}
-      <nav className="structure-nav-strip" aria-label="Visual learning sections">
-        <button
-          type="button"
-          className={activeSection === "overview" ? "active" : ""}
-          onClick={() => handleSectionNavigate("overview")}
-          aria-label="Scroll to Section 1: Three Systems"
-        >
-          <span>01</span> Three Systems
-        </button>
-        <button
-          type="button"
-          className={activeSection === "reversible" ? "active" : ""}
-          onClick={() => handleSectionNavigate("reversible")}
-          aria-label="Scroll to Section 2: Reversibility"
-        >
-          <span>02</span> Reversibility
-        </button>
-        <button
-          type="button"
-          className={activeSection === "axioms" ? "active" : ""}
-          onClick={() => handleSectionNavigate("axioms")}
-          aria-label="Scroll to Section 3: Group Axioms"
-        >
-          <span>03</span> Group Axioms
-        </button>
-        <button
-          type="button"
-          className={activeSection === "composition" ? "active" : ""}
-          onClick={() => handleSectionNavigate("composition")}
-          aria-label="Scroll to Section 4: Composition Lab"
-        >
-          <span>04</span> Composition Lab
-        </button>
-        <button
-          type="button"
-          className={activeSection === "compare" ? "active" : ""}
-          onClick={() => handleSectionNavigate("compare")}
-          aria-label="Scroll to Section 5: Group Comparison"
-        >
-          <span>05</span> Group Comparison
-        </button>
-        <button
-          type="button"
-          className={activeSection === "limits" ? "active" : ""}
-          onClick={() => handleSectionNavigate("limits")}
-          aria-label="Scroll to Section 6: Concept Map & Limits"
-        >
-          <span>06</span> Concept Map &amp; Limits
-        </button>
+      {/* Sticky section nav */}
+      <nav className="struc-nav" aria-label="Page sections">
+        {[
+          ["overview", "Three Systems"],
+          ["reversible", "Reversibility"],
+          ["axioms", "Group Axioms"],
+          ["composition", "Composition"],
+          ["compare", "Commutativity"],
+          ["takeaway", "Summary"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`struc-nav-btn ${activeSection === key ? "active" : ""}`}
+            onClick={() => scrollTo(`sec-${key}`)}
+          >
+            {label}
+          </button>
+        ))}
       </nav>
 
-      {/* ===================================================================== */}
-      {/* SECTION A: Three Systems, One Mathematical Idea                        */}
-      {/* ===================================================================== */}
-      <section className="structure-card visual-card" id="section-overview">
-        <div className="card-kicker">SECTION A ◈ THREE SYSTEMS, ONE MATHEMATICAL IDEA</div>
-        <h2 className="section-title">The Three Systems at a Glance</h2>
-        <p className="lead-paragraph">
-          Three classical cryptographic transformation systems operating over distinct mathematical domains.
-          Behind their unique mechanics lies the exact same core concept: sets of invertible bijections that satisfy the four axioms of a mathematical group.
+      {/* ================================================================== */}
+      {/* SECTION B — Three Systems, One Idea                                */}
+      {/* ================================================================== */}
+      <section id="sec-overview" className="struc-section">
+        <SectionEyebrow label="01 · Three Systems, One Idea" />
+        <h2 className="struc-h2">Three systems.<br /><em>One algebraic skeleton.</em></h2>
+        <p className="struc-lead">
+          Each system below shifts, scales, or rearranges letters. Adjust the controls — the output is computed by the mathematical engine, never hardcoded.
         </p>
 
-        {/* Conceptual Architecture Bridge */}
-        <div className="arch-bridge-container">
-          <div className="arch-bridge-step">
-            <div className="arch-step-badge">STEP 1</div>
-            <div className="arch-step-title">Three Concrete Systems</div>
-            <div className="arch-step-desc">
-              Caesar <MathView math="(\mathbb{Z}_{26}, +)" />, Affine <MathView math="\mathrm{Aff}(\mathbb{Z}_{26})" />, and <MathView math="S_4" /> position permutations.
+        <div className="systems-grid">
+
+          {/* Caesar */}
+          <div className="sys-card caesar-card">
+            <div className="sys-card-top">
+              <span className="sys-pill violet">Caesar Cipher</span>
+              <span className="sys-domain">
+                <MathView math="(\mathbb{Z}_{26},\, +)" />
+              </span>
             </div>
-          </div>
-          <div className="arch-bridge-arrow">⟶</div>
-          <div className="arch-bridge-step">
-            <div className="arch-step-badge">STEP 2</div>
-            <div className="arch-step-title">Bijections & Composition</div>
-            <div className="arch-step-desc">
-              Every key is an invertible map <MathView math="T : X \to X" />. Applying keys sequentially defines composition <MathView math="T_2 \circ T_1" />.
-            </div>
-          </div>
-          <div className="arch-bridge-arrow">⟶</div>
-          <div className="arch-bridge-step highlighted">
-            <div className="arch-step-badge">STEP 3</div>
-            <div className="arch-step-title">Universal Group Axioms</div>
-            <div className="arch-step-desc">
-              Closure, Associativity, Identity <MathView math="e" />, and Inverses <MathView math="T^{-1}" /> form algebraic groups <MathView math="(G, \circ)" />.
-            </div>
-          </div>
-        </div>
+            <p className="sys-tagline">Shifts every letter by a fixed amount, wrapping at Z.</p>
 
-        {/* View Mode Toolbar */}
-        <div className="section-a-toolbar">
-          <div className="view-mode-label">Display Mode:</div>
-          <div className="view-mode-pills" role="tablist">
-            <button
-              type="button"
-              className={`view-pill ${sectionAView === "all" ? "active" : ""}`}
-              onClick={() => setSectionAView("all")}
-            >
-              ⊞ Comparative View (All 3)
-            </button>
-            <button
-              type="button"
-              className={`view-pill ${sectionAView === "caesar" ? "active" : ""}`}
-              onClick={() => setSectionAView("caesar")}
-            >
-              01 Caesar (C₂₆)
-            </button>
-            <button
-              type="button"
-              className={`view-pill ${sectionAView === "affine" ? "active" : ""}`}
-              onClick={() => setSectionAView("affine")}
-            >
-              02 Affine (G_aff)
-            </button>
-            <button
-              type="button"
-              className={`view-pill ${sectionAView === "permutation" ? "active" : ""}`}
-              onClick={() => setSectionAView("permutation")}
-            >
-              03 Permutations (S₄)
-            </button>
-          </div>
-        </div>
-
-        <div className={`three-systems-grid ${sectionAView !== "all" ? "single-system-active" : ""}`}>
-          {/* ================================================================= */}
-          {/* Panel 1: Caesar Cipher                                            */}
-          {/* ================================================================= */}
-          {(sectionAView === "all" || sectionAView === "caesar") && (
-            <div className={`system-visual-panel caesar-panel ${sectionAView === "caesar" ? "expanded-panel" : ""}`}>
-              <div className="panel-badge-top">
-                <span className="system-pill violet">SYSTEM 01</span>
-                <span className="domain-pill">Domain: <MathView math="\mathbb{Z}_{26}" /></span>
-                <span className="order-tag">|C₂₆| = 26</span>
-              </div>
-              <div className="panel-header-content">
-                <h3>Caesar Cipher</h3>
-                <p className="panel-desc">Uniform cyclic translation along the 26-residue ring <MathView math="\mathbb{Z}_{26}" />.</p>
-              </div>
-
-              <div className="panel-workbench">
-                {/* Controls Bar */}
-                <div className="panel-controls-bar">
-                  <div className="control-group">
-                    <label htmlFor="caesar-shift-slider">
-                      Shift Key <MathView math="k" />: <strong>{caesarShiftA}</strong>
-                    </label>
-                    <div className="slider-with-presets">
-                      <input
-                        id="caesar-shift-slider"
-                        type="range"
-                        min={0}
-                        max={25}
-                        value={caesarShiftA}
-                        onChange={(e) => setCaesarShiftA(Number(e.target.value))}
-                        className="caesar-slider"
-                      />
-                      <div className="preset-buttons">
-                        <button
-                          type="button"
-                          className={`preset-btn ${caesarShiftA === 3 ? "active" : ""}`}
-                          onClick={() => setCaesarShiftA(3)}
-                        >
-                          k=3 (Classical)
-                        </button>
-                        <button
-                          type="button"
-                          className={`preset-btn ${caesarShiftA === 13 ? "active" : ""}`}
-                          onClick={() => setCaesarShiftA(13)}
-                        >
-                          k=13 (ROT13)
-                        </button>
-                        <button
-                          type="button"
-                          className={`preset-btn ${caesarShiftA === 25 ? "active" : ""}`}
-                          onClick={() => setCaesarShiftA(25)}
-                        >
-                          k=25 (-1 mod 26)
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Dual-Row Alphabet Instrument */}
-                <div className="alphabet-dual-track">
-                  <div className="track-section-header">
-                    <span>ROTATIONAL ALPHABET MAPPING</span>
-                    <span className="track-sub-hint">Click any letter to trace wraparound</span>
-                  </div>
-
-                  <div className="dual-row-scroll-container">
-                    <div className="dual-row-grid">
-                      {/* Plaintext row */}
-                      <div className="alphabet-row plain-row">
-                        <div className="row-head">Plain <MathView math="x" />:</div>
-                        <div className="cells-container">
-                          {ALPHABET.split("").map((ch, idx) => {
-                            const isWrap = idx + caesarShiftA >= 26;
-                            const isProbe = idx === caesarFocusLetterA;
-                            return (
-                              <button
-                                key={idx}
-                                type="button"
-                                className={`alphabet-cell ${isProbe ? "active-probe" : ""} ${isWrap ? "wrap-cell" : ""}`}
-                                onClick={() => setCaesarFocusLetterA(idx)}
-                                title={`x=${idx} (${ch}), E(${idx}) = (${idx} + ${caesarShiftA}) mod 26 = ${(idx + caesarShiftA) % 26} (${ALPHABET[(idx + caesarShiftA) % 26]})`}
-                              >
-                                <span className="cell-char">{ch}</span>
-                                <span className="cell-num">{idx}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Directional Connectors */}
-                      <div className="alphabet-connector-row">
-                        <div className="row-head">
-                          <span className="shift-indicator-badge">+{caesarShiftA}</span>
-                        </div>
-                        <div className="cells-container">
-                          {ALPHABET.split("").map((_, idx) => {
-                            const isWrap = idx + caesarShiftA >= 26;
-                            const isProbe = idx === caesarFocusLetterA;
-                            return (
-                              <div
-                                key={idx}
-                                className={`connector-item ${isProbe ? "active-probe" : ""} ${isWrap ? "wrap-connector" : ""}`}
-                              >
-                                ↓
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Ciphertext row */}
-                      <div className="alphabet-row cipher-row">
-                        <div className="row-head">Cipher <MathView math="E(x)" />:</div>
-                        <div className="cells-container">
-                          {ALPHABET.split("").map((_, idx) => {
-                            const cipherVal = (idx + caesarShiftA) % 26;
-                            const cipherChar = ALPHABET[cipherVal];
-                            const isWrap = idx + caesarShiftA >= 26;
-                            const isProbe = idx === caesarFocusLetterA;
-                            return (
-                              <button
-                                key={idx}
-                                type="button"
-                                className={`alphabet-cell cipher-cell ${isProbe ? "active-probe" : ""} ${isWrap ? "wrap-cell" : ""}`}
-                                onClick={() => setCaesarFocusLetterA(idx)}
-                              >
-                                <span className="cell-char">{cipherChar}</span>
-                                <span className="cell-num">{cipherVal}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Wraparound Callout & Active Probe */}
-                  <div className="wraparound-integrated-callout">
-                    <div className="wrap-zone-badge">
-                      <span className="wrap-tag">WRAPAROUND ZONE</span>
-                      <span className="wrap-desc">
-                        Letters with <MathView math={`x + ${caesarShiftA} \\ge 26`} /> wrap past Z back to A:
-                      </span>
-                      <div className="wrap-examples-inline">
-                        {caesarShiftA > 0 ? (
-                          <span>
-                            {ALPHABET[26 - Math.min(caesarShiftA, 3)]} ({26 - Math.min(caesarShiftA, 3)}) ⟶ {ALPHABET[(26 - Math.min(caesarShiftA, 3) + caesarShiftA) % 26]} ({(26 - Math.min(caesarShiftA, 3) + caesarShiftA) % 26}), ..., Z (25) ⟶ {ALPHABET[(25 + caesarShiftA) % 26]} ({(25 + caesarShiftA) % 26})
-                          </span>
-                        ) : (
-                          <span>Shift is 0 (Identity mapping e; no wraparound)</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="probe-result-pill">
-                      <span className="probe-title">Active Probe:</span>
-                      <code>
-                        '{caesarProbeChar}' ({caesarProbeVal}) + {caesarShiftA} = {caesarProbeVal + caesarShiftA}
-                        {caesarWrapsAround ? ` ≡ ${caesarProbeShiftedVal}` : ""} mod 26 ⟶ '{caesarProbeShiftedChar}'
-                      </code>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mathematical Formula */}
-                <div className="panel-formula-card">
-                  <div className="formula-label">MATHEMATICAL DEFINITION</div>
-                  <MathView math="E_k(x) = (x + k) \bmod 26" display />
-                  <div className="formula-eval">
-                    <MathView
-                      math={`E_{${caesarShiftA}}(${caesarProbeVal}) = (${caesarProbeVal} + ${caesarShiftA}) \\bmod 26 = ${caesarProbeShiftedVal} \\quad (\\text{'${caesarProbeChar}'} \\mapsto \\text{'${caesarProbeShiftedChar}'})`}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ================================================================= */}
-          {/* Panel 2: Affine Cipher                                            */}
-          {/* ================================================================= */}
-          {(sectionAView === "all" || sectionAView === "affine") && (
-            <div className={`system-visual-panel affine-panel ${sectionAView === "affine" ? "expanded-panel" : ""}`}>
-              <div className="panel-badge-top">
-                <span className="system-pill blue">SYSTEM 02</span>
-                <span className="domain-pill">Domain: <MathView math="\mathbb{Z}_{26}" /></span>
-                <span className="order-tag">|G_aff| = 312</span>
-              </div>
-              <div className="panel-header-content">
-                <h3>Affine Cipher</h3>
-                <p className="panel-desc">A modular linear transformation combining scaling and translation.</p>
-              </div>
-
-              <div className="panel-workbench">
-                {/* Controls Bar */}
-                <div className="affine-controls-grid">
-                  <div className="control-item">
-                    <label htmlFor="affine-mult-select">
-                      Multiplier <MathView math="a" /> (<MathView math="\gcd(a, 26)=1" />):
-                    </label>
-                    <select
-                      id="affine-mult-select"
-                      value={affineMultiplierA}
-                      onChange={(e) => setAffineMultiplierA(Number(e.target.value))}
-                      className="affine-select"
-                    >
-                      {AFFINE_UNITS.map((u) => (
-                        <option key={u} value={u}>
-                          a = {u} (coprime)
-                        </option>
-                      ))}
-                      <option value={2}>a = 2 (INVALID: gcd=2)</option>
-                      <option value={4}>a = 4 (INVALID: gcd=2)</option>
-                      <option value={13}>a = 13 (INVALID: gcd=13)</option>
-                    </select>
-                  </div>
-
-                  <div className="control-item">
-                    <label htmlFor="affine-shift-slider">
-                      Shift <MathView math="b" />: <strong>{affineShiftA}</strong>
-                    </label>
-                    <input
-                      id="affine-shift-slider"
-                      type="range"
-                      min={0}
-                      max={25}
-                      value={affineShiftA}
-                      onChange={(e) => setAffineShiftA(Number(e.target.value))}
-                      className="affine-slider"
-                    />
-                  </div>
-
-                  <div className="control-item">
-                    <label htmlFor="affine-input-select">Input Symbol <MathView math="x" />:</label>
-                    <select
-                      id="affine-input-select"
-                      value={affineInputA}
-                      onChange={(e) => setAffineInputA(e.target.value)}
-                      className="affine-select"
-                    >
-                      {["A", "C", "E", "H", "M", "Q", "T", "X", "Z"].map((c) => (
-                        <option key={c} value={c}>
-                          {c} (x = {c.charCodeAt(0) - 65})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Validation Status */}
-                {!isAffineValid ? (
-                  <div className="affine-validation-error" role="alert">
-                    <div className="error-title">
-                      ⚠️ Invalid Key Multiplier: <MathView math={`\\gcd(${affineMultiplierA}, 26) = ${affineGcdVal} \\ne 1`} />
-                    </div>
-                    <p className="error-desc">
-                      Because <MathView math={`${affineMultiplierA}`} /> shares factor <MathView math={`${affineGcdVal}`} /> with 26, the mapping is non-injective (causes collisions). No modular inverse exists, so decryption is mathematically impossible.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="affine-validation-success">
-                    <span className="success-icon">✓</span>
-                    <span>
-                      Valid key: <MathView math={`\\gcd(${affineMultiplierA}, 26) = 1`} />. Modular inverse <MathView math={`a^{-1} = ${affineInvMult ?? 'none'} \\pmod{26}`} /> exists.
-                    </span>
-                  </div>
-                )}
-
-                {/* Horizontally Aligned Precision Calculation Pipeline */}
-                <div className="affine-pipeline-card">
-                  <div className="pipeline-header">
-                    <span>CALCULATION PIPELINE</span>
-                    <code>(a · x + b) mod 26</code>
-                  </div>
-
-                  <div className="pipeline-horizontal-track">
-                    {/* Node 1: Input Symbol */}
-                    <div className="pipe-node">
-                      <div className="pipe-node-label">01 INPUT</div>
-                      <div className="pipe-node-box">
-                        <strong className="pipe-char">{affineInputA}</strong>
-                        <span className="pipe-val">x = {affineValA}</span>
-                      </div>
-                      <div className="pipe-subtext">Original residue</div>
-                    </div>
-
-                    {/* Arrow 1: Multiply */}
-                    <div className="pipe-arrow-connector">
-                      <span className="op-tag">× {affineMultiplierA}</span>
-                      <span className="arrow-glyph">⟶</span>
-                    </div>
-
-                    {/* Node 2: Product */}
-                    <div className="pipe-node">
-                      <div className="pipe-node-label">02 MULTIPLY</div>
-                      <div className="pipe-node-box">
-                        <strong className="pipe-num">{affineStepMultiply}</strong>
-                        <span className="pipe-val">{affineMultiplierA} · {affineValA}</span>
-                      </div>
-                      <div className="pipe-subtext">Scaled residue</div>
-                    </div>
-
-                    {/* Arrow 2: Add */}
-                    <div className="pipe-arrow-connector">
-                      <span className="op-tag">+ {affineShiftA}</span>
-                      <span className="arrow-glyph">⟶</span>
-                    </div>
-
-                    {/* Node 3: Sum */}
-                    <div className="pipe-node">
-                      <div className="pipe-node-label">03 ADD</div>
-                      <div className="pipe-node-box">
-                        <strong className="pipe-num">{affineStepAdd}</strong>
-                        <span className="pipe-val">{affineStepMultiply} + {affineShiftA}</span>
-                      </div>
-                      <div className="pipe-subtext">Shifted sum</div>
-                    </div>
-
-                    {/* Arrow 3: Modulo */}
-                    <div className="pipe-arrow-connector">
-                      <span className="op-tag">mod 26</span>
-                      <span className="arrow-glyph">⟶</span>
-                    </div>
-
-                    {/* Node 4: Modulo Residue */}
-                    <div className="pipe-node">
-                      <div className="pipe-node-label">04 MODULO</div>
-                      <div className="pipe-node-box">
-                        <strong className="pipe-num">{affineStepMod}</strong>
-                        <span className="pipe-val">{affineStepAdd} % 26</span>
-                      </div>
-                      <div className="pipe-subtext">Cyclic reduction</div>
-                    </div>
-
-                    {/* Arrow 4: Mapping */}
-                    <div className="pipe-arrow-connector">
-                      <span className="op-tag">Symbol</span>
-                      <span className="arrow-glyph">⟶</span>
-                    </div>
-
-                    {/* Node 5: Output Ciphertext */}
-                    <div className="pipe-node accent-node">
-                      <div className="pipe-node-label">05 OUTPUT</div>
-                      <div className="pipe-node-box accent-box">
-                        <strong className="pipe-char accent-char">{affineOutputCharA}</strong>
-                        <span className="pipe-val accent-val">y = {affineStepMod}</span>
-                      </div>
-                      <div className="pipe-subtext">Cipher character</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mathematical Formula */}
-                <div className="panel-formula-card">
-                  <div className="formula-label">MATHEMATICAL DEFINITION</div>
-                  <MathView math="E_{a,b}(x) = (a \cdot x + b) \bmod 26" display />
-                  <div className="formula-eval">
-                    <MathView
-                      math={`E_{${affineMultiplierA}, ${affineShiftA}}(${affineValA}) = (${affineMultiplierA} \\cdot ${affineValA} + ${affineShiftA}) \\bmod 26 = ${affineStepAdd} \\bmod 26 = ${affineStepMod} \\implies \\text{'${affineOutputCharA}'}`}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ================================================================= */}
-          {/* Panel 3: Position Permutations                                    */}
-          {/* ================================================================= */}
-          {(sectionAView === "all" || sectionAView === "permutation") && (
-            <div className={`system-visual-panel permutation-panel ${sectionAView === "permutation" ? "expanded-panel" : ""}`}>
-              <div className="panel-badge-top">
-                <span className="system-pill silver">SYSTEM 03</span>
-                <span className="domain-pill">Domain: <MathView math="\{1, 2, 3, 4\}" /></span>
-                <span className="order-tag">|S₄| = 24</span>
-              </div>
-              <div className="panel-header-content">
-                <h3>Position Permutations</h3>
-                <p className="panel-desc">Coordinate block bijection shuffling 4 character positions.</p>
-              </div>
-
-              <div className="panel-workbench">
-                {/* Permutation Key Controls */}
-                <div className="perm-controls-bar">
-                  <div className="control-group">
-                    <span className="control-label">Key <MathView math="\sigma \in S_4" />:</span>
-                    <strong className="perm-key-label">{permutationLabel(permKeyA)}</strong>
-                    <button
-                      type="button"
-                      className="cycle-key-button"
-                      onClick={() => setPermKeyIndexA((prev) => (prev + 1) % S4.length)}
-                      title="Step to next permutation in S4"
-                    >
-                      Cycle key ↻
-                    </button>
-                  </div>
-                  <div className="preset-buttons perm-presets">
-                    <button
-                      type="button"
-                      className={`preset-btn ${permKeyIndexA === 13 ? "active" : ""}`}
-                      onClick={() => setPermKeyIndexA(13)}
-                      title="Established research example [3, 1, 4, 2]"
-                    >
-                      [3, 1, 4, 2]
-                    </button>
-                    <button
-                      type="button"
-                      className={`preset-btn ${permKeyIndexA === 9 ? "active" : ""}`}
-                      onClick={() => setPermKeyIndexA(9)}
-                      title="4-cycle rotation"
-                    >
-                      [2, 3, 4, 1]
-                    </button>
-                    <button
-                      type="button"
-                      className={`preset-btn ${permKeyIndexA === 23 ? "active" : ""}`}
-                      onClick={() => setPermKeyIndexA(23)}
-                      title="Reversal involution"
-                    >
-                      [4, 3, 2, 1]
-                    </button>
-                    <button
-                      type="button"
-                      className={`preset-btn ${permKeyIndexA === 0 ? "active" : ""}`}
-                      onClick={() => setPermKeyIndexA(0)}
-                      title="Identity permutation"
-                    >
-                      [1, 2, 3, 4]
-                    </button>
-                  </div>
-                </div>
-
-                {/* Input Text Block Field */}
-                <div className="perm-input-strip">
-                  <label htmlFor="perm-block-input">4-Character Block:</label>
-                  <input
-                    id="perm-block-input"
-                    type="text"
-                    maxLength={4}
-                    value={permBlockA}
-                    onChange={(e) => setPermBlockA(e.target.value)}
-                    className="perm-text-input"
-                    placeholder="ABCD"
-                  />
-                  <span className="perm-input-note">Uppercase 4 letters</span>
-                </div>
-
-                {/* Precise Mapping Diagram */}
-                <div className="perm-diagram-stage">
-                  <div className="diagram-stage-header">
-                    <span>COORDINATE BIJECTION DIAGRAM</span>
-                    <code>{permutationLabel(permKeyA)}</code>
-                  </div>
-
-                  {/* Input Nodes Row */}
-                  <div className="perm-nodes-row input-row">
-                    <div className="nodes-row-legend">INPUT</div>
-                    <div className="nodes-cells-grid">
-                      {permCleanBlockA.split("").map((ch, idx) => {
-                        // idx is 0..3 (positions 1..4)
-                        const colors = ["#b0a3ff", "#9fcff1", "#f6c177", "#8df0a9"];
-                        const destOutPos = (permKeyA as readonly number[]).indexOf(idx) + 1;
-                        return (
-                          <div
-                            key={idx}
-                            className={`perm-diagram-node input-node node-color-${idx}`}
-                            style={{ borderColor: colors[idx] }}
-                          >
-                            <span className="node-pos-pill" style={{ color: colors[idx] }}>
-                              POS {idx + 1}
-                            </span>
-                            <strong className="node-char">{ch}</strong>
-                            <small className="node-dest-tag">⟶ out #{destOutPos}</small>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* SVG Connected Mapping Paths */}
-                  <div className="perm-svg-wrap">
-                    <svg
-                      className="perm-svg-canvas"
-                      viewBox="0 0 400 90"
-                      preserveAspectRatio="none"
-                      aria-label="Permutation mapping diagram connecting inputs to outputs"
-                    >
-                      <defs>
-                        {["#b0a3ff", "#9fcff1", "#f6c177", "#8df0a9"].map((color, idx) => (
-                          <marker
-                            key={idx}
-                            id={`perm-arrow-${idx}`}
-                            markerWidth="6"
-                            markerHeight="6"
-                            refX="5"
-                            refY="3"
-                            orient="auto"
-                          >
-                            <path d="M 0 0 L 6 3 L 0 6 z" fill={color} />
-                          </marker>
-                        ))}
-                      </defs>
-
-                      {/* 4 Connected Curves: output j receives from input permKeyA[j] */}
-                      {permKeyA.map((srcIdx, outIdx) => {
-                        const colors = ["#b0a3ff", "#9fcff1", "#f6c177", "#8df0a9"];
-                        // Coordinates: 4 columns centered at 50, 150, 250, 350
-                        const startX = 50 + srcIdx * 100;
-                        const endX = 50 + outIdx * 100;
-                        const color = colors[srcIdx];
-                        return (
-                          <path
-                            key={outIdx}
-                            d={`M ${startX} 4 C ${startX} 44, ${endX} 44, ${endX} 82`}
-                            fill="none"
-                            stroke={color}
-                            strokeWidth="2.5"
-                            markerEnd={`url(#perm-arrow-${srcIdx})`}
-                            className="perm-vector-path"
-                          />
-                        );
-                      })}
-                    </svg>
-                  </div>
-
-                  {/* Output Nodes Row */}
-                  <div className="perm-nodes-row output-row">
-                    <div className="nodes-row-legend">OUTPUT</div>
-                    <div className="nodes-cells-grid">
-                      {permOutputBlockA.split("").map((ch, outIdx) => {
-                        const srcIdx = permKeyA[outIdx]; // 0..3
-                        const colors = ["#b0a3ff", "#9fcff1", "#f6c177", "#8df0a9"];
-                        const srcColor = colors[srcIdx];
-                        return (
-                          <div
-                            key={outIdx}
-                            className={`perm-diagram-node output-node node-color-${srcIdx}`}
-                            style={{ borderColor: srcColor }}
-                          >
-                            <span className="node-pos-pill" style={{ color: "var(--dim)" }}>
-                              POS {outIdx + 1}
-                            </span>
-                            <strong className="node-char" style={{ color: srcColor }}>{ch}</strong>
-                            <small className="node-src-tag" style={{ color: srcColor }}>
-                              ← in #{srcIdx + 1}
-                            </small>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Coordinate Mapping Explicit Table */}
-                  <div className="perm-mapping-specs">
-                    {permKeyA.map((srcIdx, outIdx) => (
-                      <div key={outIdx} className="mapping-spec-item">
-                        <span className="spec-out">Out Pos {outIdx + 1}</span>
-                        <span className="spec-arrow">⟵</span>
-                        <span className="spec-in">In Pos {srcIdx + 1} ('{permCleanBlockA[srcIdx]}')</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Mathematical Formula */}
-                <div className="panel-formula-card">
-                  <div className="formula-label">MATHEMATICAL DEFINITION</div>
-                  <MathView
-                    math={`[${permKeyA.map((v) => v + 1).join(', ')}] : \\mathrm{${permCleanBlockA}} \\longmapsto \\mathrm{${permOutputBlockA}}`}
-                    display
-                  />
-                  <div className="formula-eval">
-                    <MathView math="|S_4| = 4! = 24 \text{ bijective coordinate permutations}" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Section A Thesis & Shared Structure Comparison */}
-        <div className="thesis-banner visual-thesis">
-          <div className="thesis-top-row">
-            <div className="thesis-kicker">SHARED ALGEBRAIC STRUCTURE</div>
-            <div className="thesis-headline">
-              Different transformations. Different domains. Shared group axioms.
-            </div>
-          </div>
-          <p className="thesis-subtext">
-            While each system operates over its own mathematical space, all three satisfy the identical formal requirements of a mathematical group.
-            Their differences lie in their underlying sets, operations, and commutativity properties.
-          </p>
-
-          <div className="structure-comparison-cards">
-            <div className="struct-comp-card">
-              <div className="comp-card-badge violet">CAESAR CIPHER</div>
-              <div className="comp-card-math"><MathView math="C_{26} \cong (\mathbb{Z}_{26}, +)" /></div>
-              <ul className="comp-card-traits">
-                <li><strong>Domain:</strong> Residues <MathView math="\mathbb{Z}_{26}" /></li>
-                <li><strong>Operation:</strong> Translation <MathView math="(x+k) \bmod 26" /></li>
-                <li><strong>Order:</strong> <MathView math="|C_{26}| = 26" /></li>
-                <li><strong>Commutative:</strong> Yes (Abelian)</li>
-              </ul>
-            </div>
-
-            <div className="struct-comp-card">
-              <div className="comp-card-badge blue">AFFINE CIPHER</div>
-              <div className="comp-card-math"><MathView math="\mathrm{Aff}(\mathbb{Z}_{26}) \cong \mathbb{Z}_{26} \rtimes \mathbb{Z}_{26}^\times" /></div>
-              <ul className="comp-card-traits">
-                <li><strong>Domain:</strong> Residues <MathView math="\mathbb{Z}_{26}" /></li>
-                <li><strong>Operation:</strong> <MathView math="(ax+b) \bmod 26, \, \gcd(a,26)=1" /></li>
-                <li><strong>Order:</strong> <MathView math="|G_{\mathrm{aff}}| = 12 \times 26 = 312" /></li>
-                <li><strong>Commutative:</strong> No (Non-Abelian)</li>
-              </ul>
-            </div>
-
-            <div className="struct-comp-card">
-              <div className="comp-card-badge silver">POSITION PERMUTATIONS</div>
-              <div className="comp-card-math"><MathView math="S_4 \text{ (Symmetric Group)}" /></div>
-              <ul className="comp-card-traits">
-                <li><strong>Domain:</strong> Coordinates <MathView math="\{1, 2, 3, 4\}" /></li>
-                <li><strong>Operation:</strong> Coordinate bijection <MathView math="\sigma" /></li>
-                <li><strong>Order:</strong> <MathView math="|S_4| = 4! = 24" /></li>
-                <li><strong>Commutative:</strong> No (Non-Abelian)</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===================================================================== */}
-      {/* SECTION B: What Makes a Transformation Reversible?                     */}
-      {/* ===================================================================== */}
-      <section className="structure-card visual-card" id="section-reversibility">
-        <div className="card-kicker">SECTION B ◈ WHAT MAKES A TRANSFORMATION REVERSIBLE?</div>
-        <h2 className="section-title">Reversibility, Bijections, and Collisions</h2>
-        <p className="lead-paragraph">
-          Encryption is only useful if decryption is deterministic and complete.
-          A transformation <MathView math="T : X \to X" /> is reversible if and only if it is a <strong>bijection</strong>:
-          every input maps to exactly one output, and no two inputs collide.
-        </p>
-
-        {/* Mode Switcher: Reversible vs Non-Bijective */}
-        <div className="reversibility-mode-switch">
-          <button
-            type="button"
-            className={bijectiveMode === "bijective" ? "active-mode" : ""}
-            onClick={() => setBijectiveMode("bijective")}
-          >
-            ✓ Reversible Bijection (Valid Encryption)
-          </button>
-          <button
-            type="button"
-            className={bijectiveMode === "non-bijective" ? "active-mode warning" : ""}
-            onClick={() => setBijectiveMode("non-bijective")}
-          >
-            ⚠ Non-Bijective Collision (Conceptual Illustration)
-          </button>
-        </div>
-
-        {bijectiveMode === "bijective" ? (
-          <div className="reversibility-demo-box">
-            <div className="demo-header-strip">
-              <span>REVERSIBLE DEMONSTRATION / COMPUTED EXAMPLE</span>
-              <span className="status-badge success">T⁻¹(T(x)) = x GUARANTEED</span>
-            </div>
-
-            <div className="reversibility-flow">
-              <div className="rev-stage">
-                <span className="stage-eyebrow">PLAINTEXT</span>
-                <div className="symbol-bubble">{revCaesarChar}</div>
-                <small>x = {revInputVal}</small>
-              </div>
-
-              <div className="rev-action">
-                <span className="action-tag">Forward T</span>
-                <span className="action-arrow">→</span>
-                <small>+{revCaesarShift} mod 26</small>
-              </div>
-
-              <div className="rev-stage">
-                <span className="stage-eyebrow">CIPHERTEXT</span>
-                <div className="symbol-bubble cipher">{revEncryptedChar}</div>
-                <small>y = {revEncryptedVal}</small>
-              </div>
-
-              <div className="rev-action">
-                <span className="action-tag">Inverse T⁻¹</span>
-                <span className="action-arrow">→</span>
-                <small>-{revCaesarShift} mod 26</small>
-              </div>
-
-              <div className="rev-stage">
-                <span className="stage-eyebrow">RECOVERED</span>
-                <div className="symbol-bubble recovered">{revDecryptedChar}</div>
-                <small>Exact match ✓</small>
-              </div>
-            </div>
-
-            <div className="reversibility-controls">
-              <label>
-                Choose letter:
-                <select
-                  value={revCaesarChar}
-                  onChange={(e) => setRevCaesarChar(e.target.value)}
-                >
-                  {ALPHABET.split("").map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Shift key (k):
+            <div className="sys-demo">
+              <div className="io-row">
                 <input
-                  type="range"
-                  min={1}
-                  max={25}
-                  value={revCaesarShift}
-                  onChange={(e) => setRevCaesarShift(Number(e.target.value))}
+                  type="text"
+                  className="word-input"
+                  value={caesarWord}
+                  maxLength={8}
+                  onChange={(e) => setCaesarWord(e.target.value.toUpperCase())}
+                  spellCheck={false}
                 />
-                <span className="val-chip">{revCaesarShift}</span>
-              </label>
+                <span className="io-arrow">→</span>
+                <div className="word-output violet">{caesarOut}</div>
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">
+                  Shift <MathView math="k" />
+                  <span className="ctrl-val">{caesarK}</span>
+                </label>
+                <input
+                  type="range" min={0} max={25} value={caesarK}
+                  onChange={(e) => setCaesarK(Number(e.target.value))}
+                  className="styled-slider violet-slider"
+                />
+              </div>
             </div>
 
-            <div className="formula-box">
-              <MathView math="T : X \to X \quad \text{and} \quad T^{-1}(T(x)) = x" display />
+            <div className="sys-formula">
+              <MathView math="E_k(x) = (x + k) \bmod 26" display />
             </div>
           </div>
-        ) : (
-          <div className="collision-demo-box">
-            <div className="demo-header-strip warning-strip">
-              <span>CONCEPTUAL ILLUSTRATION / WHY INVERSES FAIL</span>
-              <span className="status-badge error">NON-INVERTIBLE: COLLISION OCCURS</span>
-            </div>
-            
-            <p className="collision-explanation">
-              Consider an illustrative mapping where the multiplier shares a common factor with 26:
-              <br />
-              <MathView math="f(x) = (2x) \bmod 26 \quad (\gcd(2, 26) = 2 \ne 1)" display />
-              Because <MathView math="\gcd(2, 26) \ne 1" />, the multiplier has no modular inverse.
-              Multiple distinct plaintexts map to the exact same ciphertext output:
-            </p>
 
-            <div className="collision-table-wrap">
-              <table className="calculation-table">
-                <thead>
-                  <tr>
-                    <th>Plaintext x</th>
-                    <th>Numerical (x)</th>
-                    <th>Computation: (2x) mod 26</th>
-                    <th>Ciphertext y</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {nonBijectiveCollisions.map((row, idx) => (
-                    <tr key={idx} className={idx < 2 ? "collision-highlight-row" : ""}>
-                      <td><strong>{row.plainChar}</strong></td>
-                      <td>{row.val}</td>
-                      <td><code>{row.calc}</code></td>
-                      <td><strong className="collision-target">{row.cipherChar}</strong></td>
-                      <td>
-                        {idx < 2 ? (
-                          <span className="badge-no">COLLISION ON &apos;A&apos;</span>
-                        ) : (
-                          <span className="badge-no">COLLISION ON &apos;C&apos;</span>
-                        )}
-                      </td>
-                    </tr>
+          {/* Affine */}
+          <div className="sys-card affine-card">
+            <div className="sys-card-top">
+              <span className="sys-pill blue">Affine Cipher</span>
+              <span className="sys-domain">
+                <MathView math="\mathrm{Aff}(\mathbb{Z}_{26})" />
+              </span>
+            </div>
+            <p className="sys-tagline">Multiplies then shifts each letter's numerical value.</p>
+
+            <div className="sys-demo">
+              <div className="io-row">
+                <input
+                  type="text"
+                  className="word-input"
+                  value={affineWord}
+                  maxLength={8}
+                  onChange={(e) => setAffineWord(e.target.value.toUpperCase())}
+                  spellCheck={false}
+                />
+                <span className="io-arrow">→</span>
+                <div className={`word-output blue ${!isAffineValid ? "invalid" : ""}`}>
+                  {isAffineValid ? affineOut : "Invalid key"}
+                </div>
+              </div>
+              {!isAffineValid && (
+                <div className="inline-warning">
+                  <MathView math={`\\gcd(${affineA}, 26) = ${affineGcd} \\ne 1`} /> — no inverse exists
+                </div>
+              )}
+              <div className="ctrl-row">
+                <label className="ctrl-label">
+                  Multiplier <MathView math="a" />
+                </label>
+                <select
+                  className="styled-select"
+                  value={affineA}
+                  onChange={(e) => setAffineA(Number(e.target.value))}
+                >
+                  {AFFINE_UNITS.map((u) => (
+                    <option key={u} value={u}>a = {u}</option>
                   ))}
-                </tbody>
-              </table>
+                  <option value={2}>a = 2 (invalid)</option>
+                  <option value={4}>a = 4 (invalid)</option>
+                  <option value={13}>a = 13 (invalid)</option>
+                </select>
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">
+                  Shift <MathView math="b" />
+                  <span className="ctrl-val">{affineB}</span>
+                </label>
+                <input
+                  type="range" min={0} max={25} value={affineB}
+                  onChange={(e) => setAffineB(Number(e.target.value))}
+                  className="styled-slider blue-slider"
+                />
+              </div>
             </div>
 
-            <div className="warning-callout">
-              <strong>Decryption Ambiguity:</strong> When the receiver observes ciphertext <strong>&apos;A&apos;</strong>,
-              was the original plaintext <strong>&apos;A&apos; (0)</strong> or <strong>&apos;N&apos; (13)</strong>?
-              Information has been permanently destroyed. An inverse mapping cannot exist.
+            <div className="sys-formula">
+              <MathView math="E_{a,b}(x) = (a{\cdot}x + b) \bmod 26" display />
             </div>
           </div>
-        )}
-      </section>
 
-      {/* ===================================================================== */}
-      {/* SECTION C: Discover the Four Group Properties Visually                 */}
-      {/* ===================================================================== */}
-      <section className="structure-card visual-card" id="section-axioms">
-        <div className="card-kicker">SECTION C ◈ DISCOVER THE FOUR GROUP PROPERTIES VISUALLY</div>
-        <h2 className="section-title">The Four Group Axioms</h2>
-        <p className="lead-paragraph">
-          A set of reversible transformations <MathView math="G" /> forms a group under composition
-          <MathView math="\circ" /> if and only if it satisfies four foundational algebraic laws.
-        </p>
+          {/* Permutations */}
+          <div className="sys-card perm-card">
+            <div className="sys-card-top">
+              <span className="sys-pill silver">Permutations</span>
+              <span className="sys-domain">
+                <MathView math="S_4" />
+              </span>
+            </div>
+            <p className="sys-tagline">Rearranges four character positions within a block.</p>
 
-        {/* System Toggle for Axioms */}
-        <div className="axioms-system-selector">
-          <button
-            className={axiomSystem === "caesar" ? "selected" : ""}
-            onClick={() => setAxiomSystem("caesar")}
-          >
-            Caesar C₂₆
-          </button>
-          <button
-            className={axiomSystem === "affine" ? "selected" : ""}
-            onClick={() => setAxiomSystem("affine")}
-          >
-            Affine G_aff
-          </button>
-          <button
-            className={axiomSystem === "permutation" ? "selected" : ""}
-            onClick={() => setAxiomSystem("permutation")}
-          >
-            Permutations S₄
-          </button>
+            <div className="sys-demo">
+              <div className="io-row">
+                <input
+                  type="text"
+                  className="word-input mono"
+                  value={permWord}
+                  maxLength={4}
+                  onChange={(e) => setPermWord(e.target.value.toUpperCase())}
+                  spellCheck={false}
+                />
+                <span className="io-arrow">→</span>
+                <div className="word-output silver">{permOut}</div>
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">
+                  Key <MathView math="\sigma" />
+                  <span className="ctrl-val mono">{permutationLabel(permKey)}</span>
+                </label>
+                <div className="perm-quick-btns">
+                  {[
+                    [13, "[3,1,4,2]"],
+                    [9, "[2,3,4,1]"],
+                    [23, "[4,3,2,1]"],
+                    [0, "[1,2,3,4] e"],
+                  ].map(([idx, lbl]) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`perm-quick-btn ${permKeyIdx === idx ? "active" : ""}`}
+                      onClick={() => setPermKeyIdx(idx as number)}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="sys-formula">
+              <MathView
+                math={`[${permKey.map((v) => v + 1).join(",")}] : \\mathrm{${permCleanWord}} \\mapsto \\mathrm{${permOut}}`}
+                display
+              />
+            </div>
+          </div>
+
         </div>
 
-        {/* 4 Interactive Visual Modules */}
-        <div className="four-axioms-visual-grid">
-          {/* 1. Closure */}
-          <div className="axiom-module-card">
-            <div className="axiom-module-head">
-              <span className="axiom-number">01</span>
-              <h4>Closure</h4>
-              <MathView math="T_1, T_2 \in G \implies T_2 \circ T_1 \in G" />
+        {/* Connecting thesis */}
+        <div className="thesis-strip">
+          <span className="thesis-bullet violet" />
+          <span className="thesis-bullet blue" />
+          <span className="thesis-bullet silver" />
+          <span className="thesis-text">
+            Different transformations. Different domains. Every key is a bijection. Every system is a group.
+          </span>
+        </div>
+
+        {/* Foundational Mathematical Anchor: Different Transformations. One Common Structure. */}
+        <div className="common-structure-foundation">
+          <div className="found-header">
+            <span className="sys-pill lav">Foundational Synthesis</span>
+            <h3 className="found-title">Different Transformations. <em>One Common Structure.</em></h3>
+            <p className="found-lead">
+              While Caesar shifts letter positions along a cyclic ring, Affine applies linear scaling and translation, and <MathView math="S_4" /> permutes characters inside four-position blocks, all three systems share an identical abstract identity: <strong>they are mathematical groups under function composition <MathView math="(G, \circ)" /></strong>.
+            </p>
+          </div>
+
+          {/* Intuitive Explanation Before Formal Notation */}
+          <div className="found-intuitive-block">
+            <h4 className="intuitive-subtitle">The Intuitive Idea: Reversibility Through Function Composition</h4>
+            <p className="intuitive-text">
+              At first glance, shifting a letter by an offset (Caesar), multiplying and shifting by modular arithmetic (Affine), and scrambling the positions of letters in a four-character block (<MathView math="S_4" />) feel like fundamentally different operations.
+              However, abstract algebra reveals their shared DNA: <strong>every transformation is an invertible permutation (bijection) on a finite message space</strong>.
+            </p>
+            <p className="intuitive-text">
+              When we perform one transformation after another, we are doing <em>function composition</em>. Because every step must be decodable, every transformation has a guaranteed inverse. Because &ldquo;doing nothing&rdquo; is a valid key, an identity element exists. And because composition of mappings is naturally associative, every one of these three systems forms an <strong>algebraic group <MathView math="(G, \circ)" /></strong>.
+            </p>
+          </div>
+
+          <div className="found-formal-def">
+            <div className="found-def-badge">Formal Definition</div>
+            <p className="found-def-text">
+              An algebraic group <MathView math="(G, \circ)" /> consists of a set of bijective mappings <MathView math="G" /> together with the binary operation of function composition <MathView math="\circ" />, satisfying four invariant axioms: closure, associativity, existence of an identity transformation, and existence of a unique inverse for every operation.
+            </p>
+          </div>
+
+          {/* Deep-Dive Grid: Structured 6-Property Comparison */}
+          <div className="found-systems-grid">
+            {/* Caesar C26 */}
+            <div className="found-system-box caesar-box">
+              <div className="found-box-top">
+                <span className="sys-pill violet">Caesar Group C₂₆</span>
+                <span className="found-order-pill">Order |G| = 26</span>
+              </div>
+              <h4 className="found-sys-name">Cyclic Permutations of <MathView math="\mathbb{Z}_{26}" /></h4>
+              <p className="found-sys-desc">
+                Uniform modular shifts on individual letters. Forms an Abelian cyclic group generated by a single step.
+              </p>
+              
+              <ul className="sys-properties-list">
+                <li><strong>1. Transformation set:</strong> All 26 shifts <MathView math="C_{26} = \{E_k \mid k \in \mathbb{Z}_{26}\}" />, where <MathView math="E_k(x) = (x + k) \bmod 26" />.</li>
+                <li><strong>2. Binary operation:</strong> Composition of shifts, corresponding to modular addition of keys: <MathView math="E_{k_2} \circ E_{k_1} = E_{(k_1 + k_2) \bmod 26}" />.</li>
+                <li><strong>3. Identity element:</strong> Shift by zero <MathView math="E_0(x) = x" /> leaves all letters unchanged.</li>
+                <li><strong>4. Inverse element:</strong> Shift by <MathView math="-k \bmod 26 = (26 - k) \bmod 26" />, satisfying <MathView math="E_k^{-1} = E_{26-k}" />.</li>
+                <li><strong>5. Closure &amp; Associativity:</strong> Sum of integers mod 26 is closed; function composition is universally associative.</li>
+                <li><strong>6. Commutative (Abelian):</strong> Yes. <MathView math="E_{k_1} \circ E_{k_2} = E_{k_2} \circ E_{k_1}" /> because addition modulo 26 is commutative.</li>
+              </ul>
+
+              <div className="found-sys-math">
+                <MathView math="E_k(x) = (x + k) \bmod 26, \quad E_{k_2} \circ E_{k_1} = E_{(k_1 + k_2)\bmod 26}" display />
+              </div>
             </div>
-            <div className="axiom-visual-content">
-              {axiomSystem === "caesar" && (
-                <div className="axiom-inline-calc">
-                  <span>Shift k₁ = 4</span>
-                  <i>+</i>
-                  <span>Shift k₂ = 9</span>
-                  <i>=</i>
-                  <strong className="result-highlight">Shift k = 13 ∈ C₂₆</strong>
-                </div>
-              )}
-              {axiomSystem === "affine" && (
-                <div className="axiom-inline-calc">
-                  <span>E_(3, 4)</span>
-                  <i>∘</i>
-                  <span>E_(5, 7)</span>
-                  <i>=</i>
-                  <strong className="result-highlight">E_(15, 1) ∈ G_aff</strong>
-                </div>
-              )}
-              {axiomSystem === "permutation" && (
-                <div className="axiom-inline-calc">
-                  <span>[2, 1, 3, 4]</span>
-                  <i>∘</i>
-                  <span>[1, 3, 2, 4]</span>
-                  <i>=</i>
-                  <strong className="result-highlight">[3, 1, 2, 4] ∈ S₄</strong>
-                </div>
-              )}
-              <p className="axiom-module-desc">
-                Composing any two valid encryptions never leaves the system. It always yields another valid key.
+
+            {/* Affine G_aff */}
+            <div className="found-system-box affine-box">
+              <div className="found-box-top">
+                <span className="sys-pill blue">Affine Group G_aff</span>
+                <span className="found-order-pill">Order |G| = 312</span>
+              </div>
+              <h4 className="found-sys-name">Semidirect Product <MathView math="\mathbb{Z}_{26} \rtimes \mathbb{Z}_{26}^\times" /></h4>
+              <p className="found-sys-desc">
+                Combines modular scaling by a unit coprime to 26 with an additive shift. Forms a non-Abelian group.
+              </p>
+              
+              <ul className="sys-properties-list">
+                <li><strong>1. Transformation set:</strong> <MathView math="G_{\mathrm{aff}} = \{E_{a,b} \mid a \in \mathbb{Z}_{26}^\times, b \in \mathbb{Z}_{26}\}" />. 12 units <MathView math="\times" /> 26 shifts = 312 transformations.</li>
+                <li><strong>2. Binary operation:</strong> Function composition (rightmost acts first): <MathView math="E_{a,b} \circ E_{c,d} = E_{ac \bmod 26, (ad + b) \bmod 26}" />.</li>
+                <li><strong>3. Identity element:</strong> Key <MathView math="(a=1, b=0)" />, yielding <MathView math="E_{1,0}(x) = (1{\cdot}x + 0) \bmod 26 = x" />.</li>
+                <li><strong>4. Inverse element:</strong> <MathView math="E_{a,b}^{-1}(y) = a^{-1}(y - b) \bmod 26 = E_{a^{-1}, -a^{-1}b \bmod 26}(y)" />, where <MathView math="a \cdot a^{-1} \equiv 1 \pmod{26}" />.</li>
+                <li><strong>5. Closure &amp; Associativity:</strong> Products of coprimes are coprime mod 26; composition of affine maps is closed and associative.</li>
+                <li><strong>6. Commutative (Abelian):</strong> No. The multiplier of the outer function scales the shift of the inner function, so order matters.</li>
+              </ul>
+
+              <div className="found-sys-math">
+                <MathView math="E_{a,b} \circ E_{c,d} = E_{ac \bmod 26, (ad + b) \bmod 26}" display />
+              </div>
+            </div>
+
+            {/* S4 Permutations */}
+            <div className="found-system-box perm-box">
+              <div className="found-box-top">
+                <span className="sys-pill silver">Symmetric Group S₄</span>
+                <span className="found-order-pill">Order |G| = 24</span>
+              </div>
+              <h4 className="found-sys-name">Full Permutation Group of Degree 4</h4>
+              <p className="found-sys-desc">
+                Rearranges character positions within 4-character blocks. Preserves project's 1-based indexing convention.
+              </p>
+              
+              <ul className="sys-properties-list">
+                <li><strong>1. Transformation set:</strong> <MathView math="S_4 = \{\sigma \mid \sigma : \{1,2,3,4\} \to \{1,2,3,4\} \text{ bijective}\}" />, containing <MathView math="4! = 24" /> permutations.</li>
+                <li><strong>2. Binary operation:</strong> Permutation composition <MathView math="(\tau \circ \sigma)(x) = \tau(\sigma(x))" />, evaluating right-to-left.</li>
+                <li><strong>3. Identity element:</strong> The identity permutation <MathView math="[1,2,3,4]" /> leaving all four character positions unchanged.</li>
+                <li><strong>4. Inverse element:</strong> The inverse permutation <MathView math="\sigma^{-1}" /> swapping source and destination indices.</li>
+                <li><strong>5. Closure &amp; Associativity:</strong> Composing two permutations on 4 elements produces another permutation in <MathView math="S_4" />; composition is associative.</li>
+                <li><strong>6. Commutative (Abelian):</strong> No. Transpositions in <MathView math="S_4" /> do not commute in general: <MathView math="\tau \circ \sigma \ne \sigma \circ \tau" />.</li>
+              </ul>
+
+              <div className="found-sys-math">
+                <MathView math="(\tau \circ \sigma)(x) = \tau(\sigma(x)), \quad |S_4| = 4! = 24" display />
+              </div>
+            </div>
+          </div>
+
+          {/* Section: What Is Shared — And What Differs */}
+          <div className="shared-vs-differ-block">
+            <div className="shared-differ-header">
+              <span className="sys-pill lav">Comparative Synthesis</span>
+              <h4 className="shared-differ-title">What Is Shared — <em>And What Differs</em></h4>
+              <p className="shared-differ-lead">
+                Having a common algebraic structure does not mean the three transformation systems are identical. Here is what they share and where their mathematical behaviors diverge.
               </p>
             </div>
-            <button
-              type="button"
-              className="expand-def-btn"
-              onClick={() => setExpandedAxiom(expandedAxiom === 1 ? null : 1)}
-            >
-              {expandedAxiom === 1 ? "Hide formal definition" : "Formal mathematical definition ▼"}
-            </button>
-            {expandedAxiom === 1 && (
-              <div className="expanded-def-content">
+
+            <div className="shared-differ-grid">
+              <div className="shared-card">
+                <div className="shared-badge">WHAT THEY SHARE</div>
+                <h5 className="shared-card-h">The Invariant Group Blueprint</h5>
+                <ul className="shared-list">
+                  <li><strong>Bijective transformations:</strong> Every key is a 1-to-1, onto function on a finite domain, guaranteeing zero collisions.</li>
+                  <li><strong>The four group axioms:</strong> Closure, associativity, identity, and unique inverses hold universally across all three.</li>
+                  <li><strong>Deterministic reversibility:</strong> Decryption is the mathematically guaranteed application of the group inverse <MathView math="T^{-1}" />.</li>
+                  <li><strong>Compositional reasoning:</strong> Abstract algebra lets us prove properties of chained transformations without inspecting character-level details.</li>
+                </ul>
+              </div>
+
+              <div className="differ-card">
+                <div className="differ-badge">WHAT DIFFERS</div>
+                <h5 className="shared-card-h">Domains, Orders, and Algebra</h5>
+                <ul className="differ-list">
+                  <li><strong>Underlying domains:</strong> Caesar and Affine act on individual character residues in <MathView math="\mathbb{Z}_{26}" />, while <MathView math="S_4" /> acts on 4-position indices <MathView math="\{1,2,3,4\}" />.</li>
+                  <li><strong>Group orders (keyspaces):</strong> <MathView math="|C_{26}| = 26" />, <MathView math="|G_{\mathrm{aff}}| = 312" />, <MathView math="|S_4| = 24" />.</li>
+                  <li><strong>Commutativity:</strong> Caesar is strictly Abelian; Affine and <MathView math="S_4" /> are non-Abelian.</li>
+                  <li><strong>Internal structure:</strong> Cyclic group vs. Semidirect product <MathView math="\mathbb{Z}_{26} \rtimes \mathbb{Z}_{26}^\times" /> vs. Symmetric permutation group.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Cryptographic Security Clarification */}
+            <div className="security-boundary-warning">
+              <span className="warn-icon">⚠</span>
+              <div className="warn-content">
+                <strong>Crucial Distinction: Group Structure Does Not Imply Modern Cryptographic Security</strong>
                 <p>
-                  For all <MathView math="a, b \in G" />, the operation <MathView math="a \circ b" /> is uniquely defined and an element of <MathView math="G" />.
-                  In cryptography, this proves multi-layered encryption using keys from the same group provides no keyspace expansion.
+                  Satisfying group axioms is a <em>necessary condition</em> for reversible decryption, but it is <em>not sufficient</em> for secrecy. Because classical ciphers form closed groups of small order, cascading multiple passes collapses into a single pass with zero keyspace gain (<MathView math="E_{k_2} \circ E_{k_1} = E_{k^*}" />). Furthermore, Caesar and Affine preserve single-letter frequencies, while <MathView math="S_4" /> preserves block letter frequencies, making all three trivially vulnerable to cryptanalysis. Modern ciphers (e.g., AES) avoid closed groups across their complete round structure, incorporating non-linear S-boxes over Galois Fields <MathView math="\mathrm{GF}(2^8)" /> to resist algebraic attacks.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* SECTION C — Reversibility                                          */}
+      {/* ================================================================== */}
+      <section id="sec-reversible" className="struc-section">
+        <SectionEyebrow label="02 · Reversibility" />
+        <h2 className="struc-h2">A transformation is reversible<br /><em>when its inverse exists.</em></h2>
+        <p className="struc-lead">
+          The pipeline below shows the complete round-trip: encrypt with a key, then decrypt with its exact inverse. The recovered output always matches the original.
+        </p>
+
+        {/* Interactive Cryptographic Transformation Chamber */}
+        <TransformationChamber />
+
+        {/* System Switcher */}
+        <div className="tab-row">
+          {(["caesar", "affine", "permutation"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`tab-btn ${revSystem === s ? "active" : ""}`}
+              onClick={() => setRevSystem(s)}
+            >
+              {s === "caesar" ? "Caesar" : s === "affine" ? "Affine" : "S₄"}
+            </button>
+          ))}
+        </div>
+
+        {/* Controls */}
+        <div className="rev-controls">
+          {revSystem !== "permutation" && (
+            <div className="ctrl-row">
+              <label className="ctrl-label">Input letter</label>
+              <select
+                className="styled-select"
+                value={revChar}
+                onChange={(e) => setRevChar(e.target.value)}
+              >
+                {ALPHABET.split("").map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {revSystem === "caesar" && (
+            <div className="ctrl-row">
+              <label className="ctrl-label">
+                Shift k <span className="ctrl-val">{revK}</span>
+              </label>
+              <input
+                type="range" min={1} max={25} value={revK}
+                onChange={(e) => setRevK(Number(e.target.value))}
+                className="styled-slider violet-slider"
+              />
+            </div>
+          )}
+          {revSystem === "affine" && (
+            <>
+              <div className="ctrl-row">
+                <label className="ctrl-label">Multiplier a</label>
+                <select
+                  className="styled-select"
+                  value={revAffA}
+                  onChange={(e) => setRevAffA(Number(e.target.value))}
+                >
+                  {AFFINE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">
+                  Shift b <span className="ctrl-val">{revAffB}</span>
+                </label>
+                <input
+                  type="range" min={0} max={25} value={revAffB}
+                  onChange={(e) => setRevAffB(Number(e.target.value))}
+                  className="styled-slider blue-slider"
+                />
+              </div>
+            </>
+          )}
+          {revSystem === "permutation" && (
+            <div className="ctrl-row">
+              <label className="ctrl-label">Key σ</label>
+              <div className="perm-quick-btns">
+                {([13, 9, 23, 0] as const).map((idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`perm-quick-btn ${revPermIdx === idx ? "active" : ""}`}
+                    onClick={() => setRevPermIdx(idx)}
+                  >
+                    {permutationLabel(S4[idx]!)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Round-trip Pipeline */}
+        <div className="rev-pipeline">
+          <div className="rev-stage">
+            <div className="rev-stage-label">Input</div>
+            <div className={`rev-bubble ${revSystem === "permutation" ? "perm-block" : ""}`}>{revInput}</div>
+          </div>
+
+          <div className="rev-connector forward">
+            <div className="rev-op-label">
+              {revSystem === "caesar" && `+${revK} mod 26`}
+              {revSystem === "affine" && `E(${revAffA},${revAffB})`}
+              {revSystem === "permutation" && permutationLabel(revPermKey)}
+            </div>
+            <div className="rev-arrow">→</div>
+            <div className="rev-op-sublabel">encrypt</div>
+          </div>
+
+          <div className="rev-stage cipher">
+            <div className="rev-stage-label">Ciphertext</div>
+            <div className={`rev-bubble cipher-bubble ${revSystem === "permutation" ? "perm-block" : ""}`}>{revEncrypted}</div>
+          </div>
+
+          <div className="rev-connector inverse">
+            <div className="rev-op-label">{revInverseLabel}</div>
+            <div className="rev-arrow">→</div>
+            <div className="rev-op-sublabel">decrypt</div>
+          </div>
+
+          <div className="rev-stage recovered">
+            <div className="rev-stage-label">Recovered</div>
+            <div className={`rev-bubble recovered-bubble ${revSystem === "permutation" ? "perm-block" : ""}`}>{revDecrypted}</div>
+            <div className="rev-check">= Input ✓</div>
+          </div>
+        </div>
+
+        {/* Collision demo toggle */}
+        <div className="collision-toggle-row">
+          <button
+            type="button"
+            className="collapse-link"
+            onClick={() => setShowCollision((v) => !v)}
+          >
+            {showCollision ? "↑ Hide" : "↓ Show"} why non-invertible mappings fail
+          </button>
+        </div>
+
+        {showCollision && (
+          <div className="collision-panel">
+            <div className="collision-header">
+              <span className="warn-badge">⚠ Non-invertible example (not a valid cipher)</span>
+            </div>
+            <p className="collision-body">
+              With multiplier <MathView math="a=2" />, we have <MathView math="\gcd(2,26)=2\ne 1" />. Two distinct inputs map to the same output, destroying information:
+            </p>
+            <div className="collision-pairs">
+              {[
+                { p: "A", v: 0 }, { p: "N", v: 13 },
+              ].map(({ p, v }) => (
+                <div key={p} className="collision-pair">
+                  <span className="coll-input">{p} ({v})</span>
+                  <span className="coll-arrow">→</span>
+                  <span className="coll-formula">(2·{v}) mod 26 = {(2 * v) % 26}</span>
+                  <span className="coll-output">{ALPHABET[(2 * v) % 26]}</span>
+                </div>
+              ))}
+            </div>
+            <p className="collision-conclusion">
+              Both A and N both encrypt to <strong>A</strong>. The receiver cannot determine the original plaintext. No inverse exists.
+            </p>
+          </div>
+        )}
+
+        <div className="rev-formula-callout">
+          <MathView math="T : X \to X \quad\text{is reversible}\iff T^{-1}(T(x)) = x \;\forall x \in X" display />
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* SECTION D — Group Axioms                                           */}
+      {/* ================================================================== */}
+      <section id="sec-axioms" className="struc-section">
+        <SectionEyebrow label="03 · The Four Group Axioms" />
+        <h2 className="struc-h2">Four rules.<br /><em>One algebraic group.</em></h2>
+        <p className="struc-lead">
+          A set of transformations forms a group if it satisfies exactly these four laws. Click any axiom to see a computed example and its formal definition.
+        </p>
+
+        <div className="tab-row">
+          {(["caesar", "affine", "permutation"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`tab-btn ${axiomSystem === s ? "active" : ""}`}
+              onClick={() => { setAxiomSystem(s); setOpenAxiom(null); }}
+            >
+              {s === "caesar" ? "Caesar C₂₆" : s === "affine" ? "Affine G_aff" : "Permutations S₄"}
+            </button>
+          ))}
+        </div>
+
+        <div className="axioms-list">
+
+          {/* 1. Closure */}
+          <div className={`axiom-item ${openAxiom === 1 ? "open" : ""}`}>
+            <button type="button" className="axiom-summary" onClick={() => toggleAxiom(1)}>
+              <span className="axiom-num">01</span>
+              <span className="axiom-name">Closure</span>
+              <span className="axiom-formula">
+                <MathView math="T_1, T_2 \in G \implies T_2 \circ T_1 \in G" />
+              </span>
+              <span className="axiom-chevron">{openAxiom === 1 ? "▲" : "▼"}</span>
+            </button>
+            {openAxiom === 1 && (
+              <div className="axiom-detail">
+                <p>Composing two valid transformations always produces another valid transformation in the same system.</p>
+                {axiomSystem === "caesar" && (
+                  <div className="axiom-calc">
+                    <MathView
+                      math={`E_{${closureCaesar.k1}} \\circ E_{${closureCaesar.k2}} = E_{(${closureCaesar.k1}+${closureCaesar.k2})\\bmod 26} = E_{${closureCaesar.result}} \\in C_{26}`}
+                      display
+                    />
+                  </div>
+                )}
+                {axiomSystem === "affine" && (
+                  <div className="axiom-calc">
+                    <MathView
+                      math={`E_{5,7} \\circ E_{3,4} = E_{${closureAffine.a}, ${closureAffine.b}} \\in G_{\\mathrm{aff}}`}
+                      display
+                    />
+                  </div>
+                )}
+                {axiomSystem === "permutation" && (
+                  <div className="axiom-calc">
+                    <MathView
+                      math={`${permutationLabel(closurePerm.p2)} \\circ ${permutationLabel(closurePerm.p1)} = ${permutationLabel(closurePerm.result)} \\in S_4`}
+                      display
+                    />
+                  </div>
+                )}
+                <div className="axiom-formal">
+                  <MathView math="\forall\, a, b \in G : a \circ b \in G" display />
+                </div>
+                <div className="axiom-crypto-insight">
+                  <strong>Cryptographic Consequence:</strong> Group closure guarantees that combining multiple encryption passes never escapes the group's transformation space. Multi-encryption with classical keys collapses into a single equivalent key in <MathView math="G" />, providing zero keyspace expansion.
+                </div>
               </div>
             )}
           </div>
 
           {/* 2. Associativity */}
-          <div className="axiom-module-card">
-            <div className="axiom-module-head">
-              <span className="axiom-number">02</span>
-              <h4>Associativity</h4>
-              <MathView math="(T_3 \circ T_2) \circ T_1 = T_3 \circ (T_2 \circ T_1)" />
-            </div>
-            <div className="axiom-visual-content">
-              <div className="associativity-branch-visual">
-                <div className="branch-line">
-                  <span className="branch-tag">Route A:</span>
-                  <code>((T₃ ∘ T₂) ∘ T₁)(x)</code>
-                  <span className="branch-eq">=</span>
-                  <strong>Same output</strong>
-                </div>
-                <div className="branch-line">
-                  <span className="branch-tag">Route B:</span>
-                  <code>(T₃ ∘ (T₂ ∘ T₁))(x)</code>
-                  <span className="branch-eq">=</span>
-                  <strong>Same output</strong>
-                </div>
-              </div>
-              <p className="axiom-module-desc">
-                Grouping of sequential transformations does not alter the outcome. Associativity is universally inherited from function composition.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="expand-def-btn"
-              onClick={() => setExpandedAxiom(expandedAxiom === 2 ? null : 2)}
-            >
-              {expandedAxiom === 2 ? "Hide formal definition" : "Formal mathematical definition ▼"}
+          <div className={`axiom-item ${openAxiom === 2 ? "open" : ""}`}>
+            <button type="button" className="axiom-summary" onClick={() => toggleAxiom(2)}>
+              <span className="axiom-num">02</span>
+              <span className="axiom-name">Associativity</span>
+              <span className="axiom-formula">
+                <MathView math="(T_3 \circ T_2) \circ T_1 = T_3 \circ (T_2 \circ T_1)" />
+              </span>
+              <span className="axiom-chevron">{openAxiom === 2 ? "▲" : "▼"}</span>
             </button>
-            {expandedAxiom === 2 && (
-              <div className="expanded-def-content">
-                <p>
-                  For all <MathView math="f, g, h \in G" />, <MathView math="(f \circ g) \circ h = f \circ (g \circ h)" />.
-                  Proof: For any <MathView math="x \in X" />, <MathView math="((f \circ g) \circ h)(x) = (f \circ g)(h(x)) = f(g(h(x))) = (f \circ (g \circ h))(x)" />.
-                </p>
+            {openAxiom === 2 && (
+              <div className="axiom-detail">
+                <p>Grouping of sequential transformations does not change the outcome — both orderings reach the same result.</p>
+                <div className="assoc-visual">
+                  <div className="assoc-route">
+                    <span className="assoc-tag">Route A</span>
+                    <code>((T₃ ∘ T₂) ∘ T₁)(x)</code>
+                    <span className="assoc-eq">= same output</span>
+                  </div>
+                  <div className="assoc-route">
+                    <span className="assoc-tag">Route B</span>
+                    <code>(T₃ ∘ (T₂ ∘ T₁))(x)</code>
+                    <span className="assoc-eq">= same output</span>
+                  </div>
+                </div>
+                <div className="axiom-formal">
+                  <MathView math="\forall\, f, g, h \in G : (f \circ g) \circ h = f \circ (g \circ h)" display />
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+                    This is inherited from function composition itself — no extra proof needed for each system.
+                  </p>
+                </div>
+                <div className="axiom-crypto-insight">
+                  <strong>Cryptographic Consequence:</strong> Multi-party encryption and decryption pipelines can group intermediate calculations without altering the end result: <MathView math="T_{\text{dec}} \circ (T_2 \circ T_1) = (T_{\text{dec}} \circ T_2) \circ T_1" />.
+                </div>
               </div>
             )}
           </div>
 
           {/* 3. Identity */}
-          <div className="axiom-module-card">
-            <div className="axiom-module-head">
-              <span className="axiom-number">03</span>
-              <h4>Identity</h4>
-              <MathView math="e \circ T = T \circ e = T" />
-            </div>
-            <div className="axiom-visual-content">
-              {axiomSystem === "caesar" && (
-                <div className="axiom-inline-calc">
-                  <span>Shift k = 0 :</span>
-                  <code>E₀(x) = (x + 0) mod 26 = x</code>
-                  <span className="badge-yes">Neutral</span>
-                </div>
-              )}
-              {axiomSystem === "affine" && (
-                <div className="axiom-inline-calc">
-                  <span>Key (1, 0) :</span>
-                  <code>E_(1,0)(x) = (1·x + 0) mod 26 = x</code>
-                  <span className="badge-yes">Neutral</span>
-                </div>
-              )}
-              {axiomSystem === "permutation" && (
-                <div className="axiom-inline-calc">
-                  <span>[1, 2, 3, 4] :</span>
-                  <code>ABCD ↦ ABCD</code>
-                  <span className="badge-yes">Neutral</span>
-                </div>
-              )}
-              <p className="axiom-module-desc">
-                An identity element exists that leaves every message completely unchanged.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="expand-def-btn"
-              onClick={() => setExpandedAxiom(expandedAxiom === 3 ? null : 3)}
-            >
-              {expandedAxiom === 3 ? "Hide formal definition" : "Formal mathematical definition ▼"}
+          <div className={`axiom-item ${openAxiom === 3 ? "open" : ""}`}>
+            <button type="button" className="axiom-summary" onClick={() => toggleAxiom(3)}>
+              <span className="axiom-num">03</span>
+              <span className="axiom-name">Identity</span>
+              <span className="axiom-formula">
+                <MathView math="e \circ T = T \circ e = T" />
+              </span>
+              <span className="axiom-chevron">{openAxiom === 3 ? "▲" : "▼"}</span>
             </button>
-            {expandedAxiom === 3 && (
-              <div className="expanded-def-content">
-                <p>
-                  There exists a unique element <MathView math="e \in G" /> such that for all <MathView math="a \in G" />,
-                  <MathView math="e \circ a = a \circ e = a" />.
-                </p>
+            {openAxiom === 3 && (
+              <div className="axiom-detail">
+                <p>An identity transformation exists that leaves every message completely unchanged.</p>
+                {axiomSystem === "caesar" && (
+                  <div className="axiom-calc">
+                    <MathView math="E_0(x) = (x + 0) \bmod 26 = x" display />
+                    <p style={{ fontSize: 12, color: "var(--muted)" }}>Shift k = 0 is the identity element of C₂₆.</p>
+                  </div>
+                )}
+                {axiomSystem === "affine" && (
+                  <div className="axiom-calc">
+                    <MathView math="E_{1,0}(x) = (1{\cdot}x + 0) \bmod 26 = x" display />
+                    <p style={{ fontSize: 12, color: "var(--muted)" }}>Key (a=1, b=0) is the identity element of G_aff.</p>
+                  </div>
+                )}
+                {axiomSystem === "permutation" && (
+                  <div className="axiom-calc">
+                    <MathView math="[1,2,3,4] : \mathrm{ABCD} \mapsto \mathrm{ABCD}" display />
+                    <p style={{ fontSize: 12, color: "var(--muted)" }}>The identity permutation leaves every position unchanged.</p>
+                  </div>
+                )}
+                <div className="axiom-formal">
+                  <MathView math="\exists\, e \in G \;\forall\, a \in G : e \circ a = a \circ e = a" display />
+                </div>
+                <div className="axiom-crypto-insight">
+                  <strong>Cryptographic Consequence:</strong> The identity element corresponds to an unencrypted state (null cipher). It serves as the algebraic baseline against which decryption inverses are validated: <MathView math="T^{-1} \circ T = e" />.
+                </div>
               </div>
             )}
           </div>
 
           {/* 4. Inverses */}
-          <div className="axiom-module-card">
-            <div className="axiom-module-head">
-              <span className="axiom-number">04</span>
-              <h4>Inverses</h4>
-              <MathView math="T^{-1} \circ T = T \circ T^{-1} = e" />
+          <div className={`axiom-item ${openAxiom === 4 ? "open" : ""}`}>
+            <button type="button" className="axiom-summary" onClick={() => toggleAxiom(4)}>
+              <span className="axiom-num">04</span>
+              <span className="axiom-name">Inverses</span>
+              <span className="axiom-formula">
+                <MathView math="T^{-1} \circ T = T \circ T^{-1} = e" />
+              </span>
+              <span className="axiom-chevron">{openAxiom === 4 ? "▲" : "▼"}</span>
+            </button>
+            {openAxiom === 4 && (
+              <div className="axiom-detail">
+                <p>Every transformation has a unique inverse that undoes it exactly, restoring the original input.</p>
+                {axiomSystem === "caesar" && (
+                  <div className="axiom-calc">
+                    <MathView
+                      math={`E_{${caesarInvK}}(E_{${caesarInvK}}(x)) = x \\quad \\Longleftarrow \\quad ${caesarInvK} + ${caesarInvK} \\equiv ${(caesarInvK + caesarInvK) % 26} \\pmod{26}`}
+                      display
+                    />
+                    <p style={{ fontSize: 12, color: "var(--muted)" }}>
+                      Inverse of shift +{caesarInvK} is shift −{caesarInvK} = shift {(26 - caesarInvK) % 26} mod 26.
+                    </p>
+                  </div>
+                )}
+                {axiomSystem === "affine" && affineInvKey && (
+                  <div className="axiom-calc">
+                    <MathView
+                      math={`E_{${affineInvKey.a},${affineInvKey.b}}\\!\\left(E_{5,8}(x)\\right) = x`}
+                      display
+                    />
+                    <p style={{ fontSize: 12, color: "var(--muted)" }}>
+                      Inverse of E(5,8) is E({affineInvKey.a},{affineInvKey.b}), where {affineInvKey.a} = 5⁻¹ mod 26.
+                    </p>
+                  </div>
+                )}
+                {axiomSystem === "permutation" && (
+                  <div className="axiom-calc">
+                    <MathView
+                      math={`[3,1,4,2]^{-1} = [2,4,1,3] \\quad\\text{and}\\quad \\sigma^{-1}(\\sigma(\\text{ABCD})) = \\text{ABCD}`}
+                      display
+                    />
+                  </div>
+                )}
+                <div className="axiom-formal">
+                  <MathView math="\forall\, a \in G \;\exists\, a^{-1} \in G : a \circ a^{-1} = a^{-1} \circ a = e" display />
+                </div>
+                <div className="axiom-crypto-insight">
+                  <strong>Cryptographic Consequence:</strong> The existence of inverses is the foundational mathematical criterion for decryption without information loss. In Affine ciphers, this is why <MathView math="\gcd(a, 26) = 1" /> is an absolute prerequisite.
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* SECTION E — Composition                                            */}
+      {/* ================================================================== */}
+      <section id="sec-composition" className="struc-section">
+        <SectionEyebrow label="04 · Composition" />
+        <h2 className="struc-h2">Apply T₁, then T₂.<br /><em>The result is T₂ ∘ T₁.</em></h2>
+        <p className="struc-lead">
+          Composition means applying two transformations sequentially. The rightmost function acts first:{" "}
+          <MathView math="(T_2 \circ T_1)(x) = T_2(T_1(x))" />.
+          The composed transformation has its own inverse that restores the original.
+        </p>
+
+        <div className="tab-row">
+          {(["caesar", "affine", "permutation"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`tab-btn ${compSystem === s ? "active" : ""}`}
+              onClick={() => setCompSystem(s)}
+            >
+              {s === "caesar" ? "Caesar" : s === "affine" ? "Affine" : "S₄"}
+            </button>
+          ))}
+        </div>
+
+        {/* Controls per system */}
+        <div className="comp-controls">
+          {compSystem === "caesar" && (
+            <div className="comp-ctrl-grid">
+              <div className="ctrl-row">
+                <label className="ctrl-label">Input</label>
+                <input
+                  type="text" maxLength={1} value={compInput}
+                  onChange={(e) => setCompInput(e.target.value.toUpperCase())}
+                  className="char-input"
+                />
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">k₁ <span className="ctrl-val">{compK1}</span></label>
+                <input type="range" min={0} max={25} value={compK1}
+                  onChange={(e) => setCompK1(Number(e.target.value))}
+                  className="styled-slider violet-slider" />
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">k₂ <span className="ctrl-val">{compK2}</span></label>
+                <input type="range" min={0} max={25} value={compK2}
+                  onChange={(e) => setCompK2(Number(e.target.value))}
+                  className="styled-slider violet-slider" />
+              </div>
             </div>
-            <div className="axiom-visual-content">
-              {axiomSystem === "caesar" && (
-                <div className="axiom-inline-calc">
-                  <span>Shift +3 followed by Shift -3 :</span>
-                  <code>E₋₃(E₃(x)) = (x + 3 - 3) = x</code>
-                  <span className="badge-yes">Restored</span>
-                </div>
-              )}
-              {axiomSystem === "affine" && (
-                <div className="axiom-inline-calc">
-                  <span>E_(5,8) followed by E_(21,14) :</span>
-                  <code>E_(21,14)(E_(5,8)(x)) = x</code>
-                  <span className="badge-yes">Restored</span>
-                </div>
-              )}
-              {axiomSystem === "permutation" && (
-                <div className="axiom-inline-calc">
-                  <span>P = [3,1,4,2] &amp; P⁻¹ = [2,4,1,3] :</span>
-                  <code>P⁻¹(P(ABCD)) = ABCD</code>
-                  <span className="badge-yes">Restored</span>
-                </div>
-              )}
-              <p className="axiom-module-desc">
-                Every valid transformation key possesses an exact algebraic inverse that unwinds it.
+          )}
+          {compSystem === "affine" && (
+            <div className="comp-ctrl-grid">
+              <div className="ctrl-row">
+                <label className="ctrl-label">Input</label>
+                <input
+                  type="text" maxLength={1} value={compInput}
+                  onChange={(e) => setCompInput(e.target.value.toUpperCase())}
+                  className="char-input"
+                />
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">T₁ (a₁)</label>
+                <select className="styled-select" value={compA1}
+                  onChange={(e) => setCompA1(Number(e.target.value))}>
+                  {AFFINE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">T₁ (b₁) <span className="ctrl-val">{compB1}</span></label>
+                <input type="range" min={0} max={25} value={compB1}
+                  onChange={(e) => setCompB1(Number(e.target.value))}
+                  className="styled-slider blue-slider" />
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">T₂ (a₂)</label>
+                <select className="styled-select" value={compA2}
+                  onChange={(e) => setCompA2(Number(e.target.value))}>
+                  {AFFINE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">T₂ (b₂) <span className="ctrl-val">{compB2}</span></label>
+                <input type="range" min={0} max={25} value={compB2}
+                  onChange={(e) => setCompB2(Number(e.target.value))}
+                  className="styled-slider blue-slider" />
+              </div>
+            </div>
+          )}
+          {compSystem === "permutation" && (
+            <div className="comp-ctrl-grid">
+              <div className="ctrl-row">
+                <label className="ctrl-label">Block</label>
+                <input
+                  type="text" maxLength={4} value={compPermWord}
+                  onChange={(e) => setCompPermWord(e.target.value.toUpperCase())}
+                  className="char-input mono"
+                />
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">π₁</label>
+                <select className="styled-select" value={compP1idx}
+                  onChange={(e) => setCompP1idx(Number(e.target.value))}>
+                  {S4.map((p, i) => <option key={i} value={i}>{permutationLabel(p)}</option>)}
+                </select>
+              </div>
+              <div className="ctrl-row">
+                <label className="ctrl-label">π₂</label>
+                <select className="styled-select" value={compP2idx}
+                  onChange={(e) => setCompP2idx(Number(e.target.value))}>
+                  {S4.map((p, i) => <option key={i} value={i}>{permutationLabel(p)}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Pipeline stages */}
+        <div className="comp-pipeline">
+          <div className="cp-stage">
+            <div className="cp-label">Input</div>
+            <div className="cp-box">
+              {compSystem === "permutation" ? compPermClean : compInputChar}
+            </div>
+          </div>
+          <div className="cp-arrow">
+            <div className="cp-arrow-tag">T₁</div>
+            <div className="cp-arrow-glyph">→</div>
+          </div>
+          <div className="cp-stage mid">
+            <div className="cp-label">After T₁</div>
+            <div className="cp-box">
+              {compSystem === "caesar" ? compCaesarStep1Char
+                : compSystem === "affine" ? compAffStep1Char
+                : compPermStep1}
+            </div>
+          </div>
+          <div className="cp-arrow">
+            <div className="cp-arrow-tag">T₂</div>
+            <div className="cp-arrow-glyph">→</div>
+          </div>
+          <div className="cp-stage output">
+            <div className="cp-label">After T₂</div>
+            <div className="cp-box accent">
+              {compSystem === "caesar" ? compCaesarStep2Char
+                : compSystem === "affine" ? compAffStep2Char
+                : compPermStep2}
+            </div>
+          </div>
+          <div className="cp-arrow inverse">
+            <div className="cp-arrow-tag">(T₂∘T₁)⁻¹</div>
+            <div className="cp-arrow-glyph">↺</div>
+          </div>
+          <div className="cp-stage recovered">
+            <div className="cp-label">Recovered</div>
+            <div className="cp-box recovered">
+              {compSystem === "caesar" ? compCaesarRecovered
+                : compSystem === "affine" ? compAffRecovered
+                : compPermRecovered}
+            </div>
+            <div className="cp-check">= Input ✓</div>
+          </div>
+        </div>
+
+        {/* Show/hide mathematics */}
+        <div className="comp-math-toggle">
+          <ExpandToggle
+            open={showCompMath}
+            onToggle={() => setShowCompMath((v) => !v)}
+            label="Show composed transformation formula"
+          />
+        </div>
+
+        {showCompMath && (
+          <div className="comp-math-detail">
+            {compSystem === "caesar" && (
+              <MathView
+                math={`E_{${compK2}} \\circ E_{${compK1}} = E_{(${compK1}+${compK2})\\bmod 26} = E_{${compCaesarCompK}}, \\quad E_{${compCaesarCompK}}^{-1} = E_{${compCaesarInvK}}`}
+                display
+              />
+            )}
+            {compSystem === "affine" && (
+              <MathView
+                math={`E_{${compA2},${compB2}} \\circ E_{${compA1},${compB1}} = E_{${compAffCompKey.a},${compAffCompKey.b}}, \\quad \\text{inv} = E_{${compAffInvKey.a},${compAffInvKey.b}}`}
+                display
+              />
+            )}
+            {compSystem === "permutation" && (
+              <MathView
+                math={`${permutationLabel(compP2)} \\circ ${permutationLabel(compP1)} = ${permutationLabel(compPermComp)}, \\quad \\text{inv} = ${permutationLabel(compPermInv)}`}
+                display
+              />
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ================================================================== */}
+      {/* SECTION F — Commutativity Comparison                               */}
+      {/* ================================================================== */}
+      <section id="sec-compare" className="struc-section">
+        <SectionEyebrow label="05 · Composition Order" />
+        <h2 className="struc-h2">Does order matter?<br /><em>It depends on the system.</em></h2>
+        <p className="struc-lead">
+          When T₁∘T₂ = T₂∘T₁ the group is <em>commutative</em> (Abelian). Caesar is — Affine and S₄ are not. The results below are engine-computed, not illustrative.
+        </p>
+
+        <div className="tab-row">
+          {(["caesar", "affine", "permutation"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`tab-btn ${commSystem === s ? "active" : ""}`}
+              onClick={() => setCommSystem(s)}
+            >
+              {s === "caesar" ? "Caesar ✓ Abelian" : s === "affine" ? "Affine ✗ Non-Abelian" : "S₄ ✗ Non-Abelian"}
+            </button>
+          ))}
+        </div>
+
+        <div className={`comm-display ${commutes ? "commutes" : "not-commutes"}`}>
+          <div className="comm-verdict">
+            {commutes
+              ? <span className="verdict yes">T₂ ∘ T₁ = T₁ ∘ T₂</span>
+              : <span className="verdict no">T₂ ∘ T₁ ≠ T₁ ∘ T₂</span>}
+          </div>
+
+          {commSystem === "caesar" && (
+            <div className="comm-paths">
+              <div className="comm-path">
+                <span className="path-label">E₇ ∘ E₃:</span>
+                <MathView math="(x + 3 + 7) \bmod 26 = E_{10}" />
+              </div>
+              <div className="comm-path">
+                <span className="path-label">E₃ ∘ E₇:</span>
+                <MathView math="(x + 7 + 3) \bmod 26 = E_{10}" />
+              </div>
+              <p className="comm-explanation">
+                Addition is commutative mod 26, so Caesar shifts always commute. Every composition E_k₂ ∘ E_k₁ = E_(k₁+k₂) mod 26, regardless of order.
               </p>
             </div>
-            <button
-              type="button"
-              className="expand-def-btn"
-              onClick={() => setExpandedAxiom(expandedAxiom === 4 ? null : 4)}
-            >
-              {expandedAxiom === 4 ? "Hide formal definition" : "Formal mathematical definition ▼"}
-            </button>
-            {expandedAxiom === 4 && (
-              <div className="expanded-def-content">
-                <p>
-                  For every <MathView math="a \in G" />, there exists <MathView math="a^{-1} \in G" /> such that
-                  <MathView math="a \circ a^{-1} = a^{-1} \circ a = e" />. This is the mathematical guarantee of exact decryption.
-                </p>
+          )}
+
+          {commSystem === "affine" && (
+            <div className="comm-paths">
+              <div className="comm-path">
+                <span className="path-label">T₂ ∘ T₁ (T₁ first):</span>
+                <MathView math={`E_{3,2} \\text{ then } E_{5,7} = E_{${aff21.a},${aff21.b}}`} />
               </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ===================================================================== */}
-      {/* SECTION D: Make Composition Intuitive                                 */}
-      {/* ===================================================================== */}
-      <section className="structure-card visual-card" id="section-composition">
-        <div className="card-kicker">SECTION D ◈ MAKE COMPOSITION INTUITIVE</div>
-        <h2 className="section-title">Interactive Composition Visualizer</h2>
-        <p className="lead-paragraph">
-          Select two transformations <MathView math="T_1" /> and <MathView math="T_2" />.
-          Observe how the pipeline applies <MathView math="T_1" /> first and <MathView math="T_2" /> second,
-          how they combine into a single direct map <MathView math="T_{\mathrm{comp}} = T_2 \circ T_1" />,
-          and how <MathView math="T_{\mathrm{comp}}^{-1}" /> restores the original input.
-        </p>
-
-        {/* Convention Callout Banner */}
-        <div className="composition-convention-banner">
-          <span className="banner-badge">MATHEMATICAL CONVENTION</span>
-          <div className="convention-equation">
-            <MathView math="(T_2 \circ T_1)(x) = T_2(T_1(x))" display />
-          </div>
-          <p className="convention-explainer">
-            The <strong>rightmost function is applied first</strong>.
-            <MathView math="T_1" /> acts on the input <MathView math="x" />. Then <MathView math="T_2" /> acts on the intermediate output <MathView math="T_1(x)" />.
-          </p>
-        </div>
-
-        {/* System Picker */}
-        <div className="demo-system-picker">
-          <button
-            type="button"
-            className={demoSystem === "caesar" ? "active" : ""}
-            onClick={() => setDemoSystem("caesar")}
-          >
-            Caesar Shift (<MathView math="C_{26}" />)
-          </button>
-          <button
-            type="button"
-            className={demoSystem === "affine" ? "active" : ""}
-            onClick={() => setDemoSystem("affine")}
-          >
-            Affine Map (<MathView math="G_{\mathrm{aff}}" />)
-          </button>
-          <button
-            type="button"
-            className={demoSystem === "permutation" ? "active" : ""}
-            onClick={() => setDemoSystem("permutation")}
-          >
-            Position Permutation (<MathView math="S_4" />)
-          </button>
-        </div>
-
-        {/* Dynamic Controls */}
-        <div className="composition-controls-panel">
-          {demoSystem === "caesar" && (
-            <div className="controls-row">
-              <label>
-                <span>Input Character:</span>
-                <input
-                  type="text"
-                  maxLength={1}
-                  value={caesarInput}
-                  onChange={(e) => setCaesarInput(e.target.value.toUpperCase())}
-                  className="demo-input-char"
-                />
-              </label>
-              <label>
-                <span>First Shift (k₁ - Applied 1st):</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={25}
-                  value={caesarK1}
-                  onChange={(e) => setCaesarK1(Number(e.target.value))}
-                />
-                <span className="val-badge">{caesarK1}</span>
-              </label>
-              <label>
-                <span>Second Shift (k₂ - Applied 2nd):</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={25}
-                  value={caesarK2}
-                  onChange={(e) => setCaesarK2(Number(e.target.value))}
-                />
-                <span className="val-badge">{caesarK2}</span>
-              </label>
+              <div className="comm-path">
+                <span className="path-label">T₁ ∘ T₂ (T₂ first):</span>
+                <MathView math={`E_{5,7} \\text{ then } E_{3,2} = E_{${aff12.a},${aff12.b}}`} />
+              </div>
+              <p className="comm-explanation">
+                <MathView math={`E_{${aff21.a},${aff21.b}} \\ne E_{${aff12.a},${aff12.b}}`} /> — order matters. The affine group is non-Abelian because the shift terms interact with different multipliers.
+              </p>
             </div>
           )}
 
-          {demoSystem === "affine" && (
-            <div className="controls-grid-affine">
-              <label>
-                <span>Input Character:</span>
-                <input
-                  type="text"
-                  maxLength={1}
-                  value={affineInput}
-                  onChange={(e) => setAffineInput(e.target.value.toUpperCase())}
-                  className="demo-input-char"
-                />
-              </label>
-              <div className="affine-pair">
-                <span className="pair-title">T₁ (Applied 1st):</span>
-                <select value={affineA1} onChange={(e) => setAffineA1(Number(e.target.value))}>
-                  {AFFINE_UNITS.map((u) => (
-                    <option key={u} value={u}>a₁ = {u}</option>
-                  ))}
-                </select>
-                <input
-                  type="range"
-                  min={0}
-                  max={25}
-                  value={affineB1}
-                  onChange={(e) => setAffineB1(Number(e.target.value))}
-                />
-                <span className="val-badge">b₁ = {affineB1}</span>
+          {commSystem === "permutation" && (
+            <div className="comm-paths">
+              <div className="comm-path">
+                <span className="path-label">P ∘ Q (Q first on ABCD):</span>
+                <code>{permutationApply(pqComm, "ABCD")}</code>
+                <span className="comm-perm-label">{permutationLabel(pqComm)}</span>
               </div>
-              <div className="affine-pair">
-                <span className="pair-title">T₂ (Applied 2nd):</span>
-                <select value={affineA2} onChange={(e) => setAffineA2(Number(e.target.value))}>
-                  {AFFINE_UNITS.map((u) => (
-                    <option key={u} value={u}>a₂ = {u}</option>
-                  ))}
-                </select>
-                <input
-                  type="range"
-                  min={0}
-                  max={25}
-                  value={affineB2}
-                  onChange={(e) => setAffineB2(Number(e.target.value))}
-                />
-                <span className="val-badge">b₂ = {affineB2}</span>
+              <div className="comm-path">
+                <span className="path-label">Q ∘ P (P first on ABCD):</span>
+                <code>{permutationApply(qpComm, "ABCD")}</code>
+                <span className="comm-perm-label">{permutationLabel(qpComm)}</span>
               </div>
-            </div>
-          )}
-
-          {demoSystem === "permutation" && (
-            <div className="controls-row">
-              <label>
-                <span>Input 4-Letter Block:</span>
-                <input
-                  type="text"
-                  maxLength={4}
-                  value={permInput}
-                  onChange={(e) => setPermInput(e.target.value.toUpperCase())}
-                  className="demo-input-block"
-                />
-              </label>
-              <label>
-                <span>π₁ (Applied 1st):</span>
-                <select value={permIdx1} onChange={(e) => setPermIdx1(Number(e.target.value))}>
-                  {S4.map((p, idx) => (
-                    <option key={idx} value={idx}>
-                      #{idx + 1}: {permutationLabel(p)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>π₂ (Applied 2nd):</span>
-                <select value={permIdx2} onChange={(e) => setPermIdx2(Number(e.target.value))}>
-                  {S4.map((p, idx) => (
-                    <option key={idx} value={idx}>
-                      #{idx + 1}: {permutationLabel(p)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <p className="comm-explanation">
+                P = [2,1,3,4] and Q = [1,3,2,4]. Since {permutationApply(pqComm, "ABCD")} ≠ {permutationApply(qpComm, "ABCD")}, S₄ is non-Abelian.
+              </p>
             </div>
           )}
         </div>
 
-        {/* Visual Pipeline with Sequential Badges */}
-        <div className="transformation-pipeline">
-          {/* Stage 1: Initial Input */}
-          <div className="pipeline-card stage-input">
-            <span className="stage-num">01 / INITIAL INPUT</span>
-            <div className="stage-symbol">
-              {demoSystem === "permutation" ? permBlock : (demoSystem === "caesar" ? caesarChar : affineChar)}
-            </div>
-            <div className="stage-detail">
-              {demoSystem === "permutation" ? (
-                <span>Position indices: (1, 2, 3, 4)</span>
-              ) : (
-                <MathView math={`x = ${demoSystem === "caesar" ? caesarVal : affineVal}`} />
-              )}
-            </div>
+        {/* Synthesis Comparison: One Algebraic Framework, Three Realizations */}
+        <div className="synthesis-comparison-block">
+          <div className="synthesis-header">
+            <span className="sys-pill lav">Comparative Matrix</span>
+            <h3 className="synthesis-title">One Algebraic Framework, <em>Three Realizations</em></h3>
+            <p className="synthesis-lead">
+              A comprehensive cross-comparison of how abstract group properties manifest across the three classical transformation systems.
+            </p>
           </div>
 
-          <div className="pipeline-connector">
-            <span className="connector-badge step1-badge">1ST APPLIED</span>
-            <span className="connector-label">T₁</span>
-            <span className="connector-arrow">→</span>
+          <div className="synthesis-table-wrap">
+            <table className="synthesis-table">
+              <thead>
+                <tr>
+                  <th>Structural Dimension</th>
+                  <th>Caesar Cipher <MathView math="(C_{26})" /></th>
+                  <th>Affine Cipher <MathView math="(G_{\mathrm{aff}})" /></th>
+                  <th>Permutations <MathView math="(S_4)" /></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="row-label">Underlying Domain <MathView math="X" /></td>
+                  <td>Single residues in <MathView math="\mathbb{Z}_{26}" /> (A–Z)</td>
+                  <td>Single residues in <MathView math="\mathbb{Z}_{26}" /> (A–Z)</td>
+                  <td>4-position index set <MathView math="\{1,2,3,4\}" /></td>
+                </tr>
+                <tr>
+                  <td className="row-label">Group Order <MathView math="|G|" /></td>
+                  <td><span className="matrix-val highlight-violet">26</span></td>
+                  <td><span className="matrix-val highlight-blue">312</span> (<MathView math="12 \times 26" />)</td>
+                  <td><span className="matrix-val highlight-silver">24</span> (<MathView math="4!" />)</td>
+                </tr>
+                <tr>
+                  <td className="row-label">Group Structure</td>
+                  <td>Cyclic group <MathView math="\cong \mathbb{Z}_{26}" /></td>
+                  <td>Semidirect product <MathView math="\mathbb{Z}_{26} \rtimes \mathbb{Z}_{26}^\times" /></td>
+                  <td>Full symmetric group <MathView math="S_4" /></td>
+                </tr>
+                <tr>
+                  <td className="row-label">Commutativity</td>
+                  <td><span className="matrix-status yes">Abelian (Commutative)</span></td>
+                  <td><span className="matrix-status no">Non-Abelian (Non-commutative)</span></td>
+                  <td><span className="matrix-status no">Non-Abelian (Non-commutative)</span></td>
+                </tr>
+                <tr>
+                  <td className="row-label">Identity Element <MathView math="e" /></td>
+                  <td><MathView math="E_0(x) = (x + 0)\bmod 26" /></td>
+                  <td><MathView math="E_{1,0}(x) = (1{\cdot}x + 0)\bmod 26" /></td>
+                  <td><MathView math="[1,2,3,4]" /> (identity mapping)</td>
+                </tr>
+                <tr>
+                  <td className="row-label">Inverse Formula</td>
+                  <td><MathView math="E_k^{-1} = E_{(26 - k)\bmod 26}" /></td>
+                  <td><MathView math="E_{a,b}^{-1} = E_{a^{-1}, -a^{-1}b \bmod 26}" /></td>
+                  <td><MathView math="\sigma^{-1}" /> (positional inverted array)</td>
+                </tr>
+                <tr>
+                  <td className="row-label">Composition Law</td>
+                  <td><MathView math="E_k \circ E_j = E_{(j + k)\bmod 26}" /></td>
+                  <td><MathView math="E_{c,d} \circ E_{a,b} = E_{ca, cb+d}" /></td>
+                  <td><MathView math="(\tau \circ \sigma)(x) = \tau(\sigma(x))" /></td>
+                </tr>
+                <tr>
+                  <td className="row-label">Cryptanalysis Vulnerability</td>
+                  <td>Single-letter frequency (shift pattern)</td>
+                  <td>Linear congruence frequency attack</td>
+                  <td>Block anagramming / position counting</td>
+                </tr>
+                <tr>
+                  <td className="row-label">Cascade Encryption Effect</td>
+                  <td>No security gain (<MathView math="E_a \circ E_b = E_{a+b}" />)</td>
+                  <td>No security gain (<MathView math="E_1 \circ E_2 = E_3" />)</td>
+                  <td>No security gain (<MathView math="\tau \circ \sigma \in S_4" />)</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
-          {/* Stage 2: Intermediate Result T1(x) */}
-          <div className="pipeline-card stage-mid">
-            <span className="stage-num">02 / INTERMEDIATE T₁(x)</span>
-            <div className="stage-symbol">
-              {demoSystem === "permutation" ? permStep1Block : (demoSystem === "caesar" ? caesarStep1Char : affineStep1Char)}
+          <div className="synthesis-takeaways-deck">
+            <div className="synthesis-insight-card">
+              <div className="insight-badge">Algebraic Principle 01</div>
+              <h4 className="insight-title">Why Group Closure Prevents Multi-Encryption Gains</h4>
+              <p className="insight-text">
+                In classical cryptography, applying multiple encryption rounds with different keys creates an illusion of security. Because <MathView math="(G, \circ)" /> satisfies the <strong>closure axiom</strong>, composing any chain of keys <MathView math="E_{k_n} \circ \dots \circ E_{k_1}" /> strictly evaluates to an existing single element <MathView math="E_{k^*} \in G" />. An attacker needs only to search the original keyspace size <MathView math="|G|" />, rendering multiple passes completely redundant.
+              </p>
             </div>
-            <div className="stage-detail">
-              {demoSystem === "caesar" && (
-                <MathView math={`E_{${caesarK1}}(${caesarVal}) = ${caesarStep1Val}`} />
-              )}
-              {demoSystem === "affine" && (
-                <MathView math={`E_{${affineA1},${affineB1}}(${affineVal}) = ${affineStep1Val}`} />
-              )}
-              {demoSystem === "permutation" && (
-                <span>{permutationLabel(p1)} applied</span>
-              )}
+            <div className="synthesis-insight-card">
+              <div className="insight-badge">Algebraic Principle 02</div>
+              <h4 className="insight-title">Reversibility vs. Cryptographic Security</h4>
+              <p className="insight-text">
+                Group theory guarantees the <em>necessary condition</em> for any cipher: exact reversibility without message entropy loss. However, it does not provide the <em>sufficient condition</em> for confidentiality. Modern block ciphers like AES intentionally avoid low-order closed algebraic groups across their complete round structure, incorporating non-linear S-boxes over Galois Fields <MathView math="\mathrm{GF}(2^8)" /> to resist algebraic attacks.
+              </p>
             </div>
-          </div>
-
-          <div className="pipeline-connector">
-            <span className="connector-badge step2-badge">2ND APPLIED</span>
-            <span className="connector-label">T₂</span>
-            <span className="connector-arrow">→</span>
-          </div>
-
-          {/* Stage 3: Final Output T2(T1(x)) */}
-          <div className="pipeline-card stage-output">
-            <span className="stage-num">03 / FINAL OUTPUT T₂(T₁(x))</span>
-            <div className="stage-symbol">
-              {demoSystem === "permutation" ? permStep2Block : (demoSystem === "caesar" ? caesarStep2Char : affineStep2Char)}
-            </div>
-            <div className="stage-detail">
-              {demoSystem === "caesar" && (
-                <MathView math={`E_{${caesarK2}}(${caesarStep1Val}) = ${caesarStep2Val}`} />
-              )}
-              {demoSystem === "affine" && (
-                <MathView math={`E_{${affineA2},${affineB2}}(${affineStep1Val}) = ${affineStep2Val}`} />
-              )}
-              {demoSystem === "permutation" && (
-                <span>{permutationLabel(p2)} applied</span>
-              )}
-            </div>
-          </div>
-
-          <div className="pipeline-connector">
-            <span className="connector-badge inv-badge">INVERSE</span>
-            <span className="connector-label">T_comp⁻¹</span>
-            <span className="connector-arrow">↺</span>
-          </div>
-
-          {/* Stage 4: Recovered Plaintext */}
-          <div className="pipeline-card stage-recovered">
-            <span className="stage-num">04 / RECOVERED x</span>
-            <div className="stage-symbol">
-              {demoSystem === "permutation" ? permRecoveredBlock : (demoSystem === "caesar" ? caesarRecoveredChar : affineRecoveredChar)}
-            </div>
-            <div className="stage-detail">
-              <span className="match-confirmed">✓ Exact Recovery Confirmed</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Single Composed Transformation Analysis */}
-        <div className="algebraic-composition-summary">
-          <h4>Single Direct Transformation: <MathView math="T_{\mathrm{composed}} = T_2 \circ T_1" /></h4>
-
-          <div className="composition-math-box">
-            {demoSystem === "caesar" && (
-              <div>
-                <p>
-                  Composing shifts <MathView math={`k_1 = ${caesarK1}`} /> and <MathView math={`k_2 = ${caesarK2}`} />:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`E_{${caesarK2}} \\circ E_{${caesarK1}} = E_{(${caesarK1} + ${caesarK2}) \\bmod 26} = E_{${caesarCompK}}`}
-                    display
-                  />
-                </div>
-                <p>
-                  Direct single evaluation on <MathView math={`x = ${caesarVal}`} />:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`E_{${caesarCompK}}(${caesarVal}) = (${caesarVal} + ${caesarCompK}) \\bmod 26 = ${caesarDirectVal} \\quad (\\mathrm{${caesarDirectChar}})`}
-                    display
-                  />
-                </div>
-                <p>
-                  Inverse transformation <MathView math={`E_{${caesarCompK}}^{-1} = E_{${caesarInvK}}`} /> restores the input:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`E_{${caesarInvK}}(${caesarDirectVal}) = (${caesarDirectVal} + ${caesarInvK}) \\bmod 26 = ${caesarRecoveredVal} \\quad (\\mathrm{${caesarRecoveredChar}})`}
-                    display
-                  />
-                </div>
-              </div>
-            )}
-
-            {demoSystem === "affine" && (
-              <div>
-                <p>
-                  Composing <MathView math={`T_1 = E_{${affineA1}, ${affineB1}}`} /> and <MathView math={`T_2 = E_{${affineA2}, ${affineB2}}`} />:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`E_{${affineA2}, ${affineB2}} \\circ E_{${affineA1}, ${affineB1}} = E_{(${affineA2} \\cdot ${affineA1}) \\bmod 26, \\; (${affineA2} \\cdot ${affineB1} + ${affineB2}) \\bmod 26} = E_{${affineCompKey.a}, ${affineCompKey.b}}`}
-                    display
-                  />
-                </div>
-                <p>
-                  Direct single evaluation on <MathView math={`x = ${affineVal}`} />:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`E_{${affineCompKey.a}, ${affineCompKey.b}}(${affineVal}) = (${affineCompKey.a} \\cdot ${affineVal} + ${affineCompKey.b}) \\bmod 26 = ${affineDirectVal} \\quad (\\mathrm{${affineDirectChar}})`}
-                    display
-                  />
-                </div>
-                <p>
-                  Inverse key <MathView math={`T_{\\mathrm{comp}}^{-1} = E_{${affineInvKey.a}, ${affineInvKey.b}}`} /> restores the input:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`E_{${affineInvKey.a}, ${affineInvKey.b}}(${affineDirectVal}) = (${affineInvKey.a} \\cdot ${affineDirectVal} + ${affineInvKey.b}) \\bmod 26 = ${affineRecoveredVal} \\quad (\\mathrm{${affineRecoveredChar}})`}
-                    display
-                  />
-                </div>
-              </div>
-            )}
-
-            {demoSystem === "permutation" && (
-              <div>
-                <p>
-                  Composing <MathView math={`\\pi_1 = ${permutationLabel(p1)}`} /> and <MathView math={`\\pi_2 = ${permutationLabel(p2)}`} />:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`\\pi_{\\mathrm{composed}} = \\pi_2 \\circ \\pi_1 = ${permutationLabel(permComp)}`}
-                    display
-                  />
-                </div>
-                <p>
-                  Direct evaluation on block <strong>{permBlock}</strong>:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`\\pi_{\\mathrm{composed}}(\\mathrm{${permBlock}}) = \\mathrm{${permDirectBlock}}`}
-                    display
-                  />
-                </div>
-                <p>
-                  Inverse permutation <MathView math={`\\pi_{\\mathrm{composed}}^{-1} = ${permutationLabel(permInv)}`} />:
-                </p>
-                <div className="formula-box">
-                  <MathView
-                    math={`\\pi_{\\mathrm{composed}}^{-1}(\\mathrm{${permDirectBlock}}) = \\mathrm{${permRecoveredBlock}}`}
-                    display
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </section>
 
-      {/* ===================================================================== */}
-      {/* SECTION E: Compare the Three Groups Visually                           */}
-      {/* ===================================================================== */}
-      <section className="structure-card visual-card" id="section-compare">
-        <div className="card-kicker">SECTION E ◈ ALGEBRAIC COMPARISON</div>
-        <h2 className="section-title">Comparing the Three Groups</h2>
-        <p className="lead-paragraph">
-          All three systems satisfy the four group axioms, but they possess fundamentally different algebraic structures,
-          domains, and commutativity properties.
-        </p>
+      {/* ================================================================== */}
+      {/* SECTION G — Summary Takeaway                                        */}
+      {/* ================================================================== */}
+      <section id="sec-takeaway" className="struc-section">
+        <SectionEyebrow label="06 · Summary" />
+        <h2 className="struc-h2">What group theory<br /><em>establishes — and what it doesn't.</em></h2>
 
-        {/* Order Metric Highlights */}
-        <div className="order-metrics-grid">
-          <div className="order-metric-card violet">
-            <span className="metric-symbol">C₂₆</span>
-            <strong className="metric-order">|C₂₆| = 26</strong>
-            <span className="metric-name">Cyclic Group of Order 26</span>
-            <small>Abelian (Commutative) &middot; Domain: ℤ₂₆</small>
-          </div>
-          <div className="order-metric-card blue">
-            <span className="metric-symbol">G_aff</span>
-            <strong className="metric-order">|G_aff| = 312</strong>
-            <span className="metric-name">Affine Group mod 26</span>
-            <small>Non-Abelian &middot; 12 units × 26 shifts &middot; Domain: ℤ₂₆</small>
-          </div>
-          <div className="order-metric-card silver">
-            <span className="metric-symbol">S₄</span>
-            <strong className="metric-order">|S₄| = 24</strong>
-            <span className="metric-name">Symmetric Group on 4 Positions</span>
-            <small>Non-Abelian &middot; 4! = 24 &middot; Domain: &#123;1, 2, 3, 4&#125;</small>
-          </div>
-        </div>
+        <div className="takeaway-grid">
 
-        {/* Side-by-Side Comparison Table */}
-        <div className="comparison-table-wrapper">
-          <table className="algebraic-comparison-table">
-            <thead>
-              <tr>
-                <th>Property</th>
-                <th>Caesar Cipher</th>
-                <th>Affine Cipher</th>
-                <th>Position Permutations</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="prop-name">Underlying Domain</td>
-                <td><MathView math="\mathbb{Z}_{26}" /> (Alphabet residues)</td>
-                <td><MathView math="\mathbb{Z}_{26}" /> (Alphabet residues)</td>
-                <td><MathView math="\{1, 2, 3, 4\}" /> (4-position blocks)</td>
-              </tr>
-              <tr>
-                <td className="prop-name">Transformation Rule</td>
-                <td><MathView math="E_k(x) = (x + k) \bmod 26" /></td>
-                <td><MathView math="E_{a,b}(x) = (ax + b) \bmod 26" /></td>
-                <td><MathView math="y_i = x_{p_i} \quad (1 \le i \le 4)" /></td>
-              </tr>
-              <tr>
-                <td className="prop-name">Transformation Count</td>
-                <td><span className="mono-highlight">26</span></td>
-                <td><span className="mono-highlight">312</span> (<MathView math="12 \times 26" />)</td>
-                <td><span className="mono-highlight">24</span> (<MathView math="4!" />)</td>
-              </tr>
-              <tr>
-                <td className="prop-name">Composition Operation</td>
-                <td>Modular addition of shifts</td>
-                <td>Affine function composition</td>
-                <td>Permutation mapping composition</td>
-              </tr>
-              <tr>
-                <td className="prop-name">Identity Element</td>
-                <td>Shift by 0: <MathView math="E_0" /></td>
-                <td><MathView math="a=1, b=0 : E_{1,0}" /></td>
-                <td>Identity permutation: <MathView math="[1, 2, 3, 4]" /></td>
-              </tr>
-              <tr>
-                <td className="prop-name">Inverse Transformation</td>
-                <td>Opposite shift: <MathView math="(-k) \bmod 26" /></td>
-                <td><MathView math="E_{a^{-1}, -a^{-1}b \bmod 26}" /></td>
-                <td>Inverse permutation <MathView math="\pi^{-1}" /></td>
-              </tr>
-              <tr>
-                <td className="prop-name">Group Structure</td>
-                <td><MathView math="C_{26} \cong (\mathbb{Z}_{26}, +)" /> (Cyclic)</td>
-                <td><MathView math="G_{\mathrm{aff}}" /> (Affine general linear)</td>
-                <td><MathView math="S_4" /> (Symmetric group)</td>
-              </tr>
-              <tr>
-                <td className="prop-name">Commutativity</td>
-                <td><span className="badge-yes">Yes (Abelian)</span></td>
-                <td><span className="badge-no">No (Non-abelian)</span></td>
-                <td><span className="badge-no">No (Non-abelian)</span></td>
-              </tr>
-              <tr>
-                <td className="prop-name">Subgroup Relationship</td>
-                <td>Normal subgroup of <MathView math="G_{\mathrm{aff}}" /></td>
-                <td>Contains <MathView math="C_{26}" /> as subgroup (<MathView math="a=1" />)</td>
-                <td>Independent domain (block coordinates)</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Subgroup Callout */}
-        <div className="subgroup-callout-panel">
-          <div className="subgroup-title">
-            <span>SUBGROUP RELATION</span>
-            <strong>Caesar is a Subgroup of the Affine Group: <MathView math="C_{26} \le G_{\mathrm{aff}}" /></strong>
-          </div>
-          <p>
-            When the affine multiplier is fixed to <MathView math="a = 1" />, the affine equation
-            <MathView math="E_{1, b}(x) = (1x + b) \bmod 26 = (x + b) \bmod 26" /> coincides precisely with Caesar shift <MathView math="E_b" />.
-            The 26 Caesar shifts form a normal cyclic subgroup inside the 312-element affine group.
-          </p>
-        </div>
-
-        {/* Commutativity Verified Engine Demonstration */}
-        <div className="commutativity-lab-box">
-          <h4>Live Verified Commutativity Profiles</h4>
-          <div className="comm-system-tabs">
-            <button
-              className={commSystem === "caesar" ? "active" : ""}
-              onClick={() => setCommSystem("caesar")}
-            >
-              Caesar: Commutative
-            </button>
-            <button
-              className={commSystem === "affine" ? "active" : ""}
-              onClick={() => setCommSystem("affine")}
-            >
-              Affine: Non-Commutative
-            </button>
-            <button
-              className={commSystem === "permutation" ? "active" : ""}
-              onClick={() => setCommSystem("permutation")}
-            >
-              S₄: Non-Commutative
-            </button>
-          </div>
-
-          <div className="comm-results-display">
-            {commSystem === "caesar" && (
-              <div className="comm-panel-card">
-                <div className="comm-status-badge yes">COMMUTATIVE: T₂ ∘ T₁ = T₁ ∘ T₂</div>
-                <p>
-                  Consider shifts <MathView math="k_1 = 3" /> and <MathView math="k_2 = 7" />:
-                </p>
-                <div className="comm-split-equations">
-                  <div className="comm-eq-side">
-                    <span>E₇ ∘ E₃:</span>
-                    <code>(x + 3 + 7) mod 26 = (x + 10) mod 26 = E₁₀</code>
-                  </div>
-                  <div className="comm-eq-side">
-                    <span>E₃ ∘ E₇:</span>
-                    <code>(x + 7 + 3) mod 26 = (x + 10) mod 26 = E₁₀</code>
-                  </div>
-                </div>
-                <p className="comm-summary">
-                  Because integer addition is commutative modulo 26, the order of Caesar shifts never alters the ciphertext.
-                </p>
-              </div>
-            )}
-
-            {commSystem === "affine" && (
-              <div className="comm-panel-card">
-                <div className="comm-status-badge no">NON-COMMUTATIVE: T₂ ∘ T₁ ≠ T₁ ∘ T₂</div>
-                <p>
-                  Computed from mathematical engine for <MathView math="T_1 = E_{3,2}" /> and <MathView math="T_2 = E_{5,7}" />:
-                </p>
-                <div className="comm-split-equations">
-                  <div className="comm-eq-side">
-                    <span>T₂ ∘ T₁ (T₁ applied first):</span>
-                    <strong>E_({aff21.a}, {aff21.b})</strong>
-                    <small>5·(3x + 2) + 7 = 15x + 17 mod 26</small>
-                  </div>
-                  <div className="comm-vs-badge">≠</div>
-                  <div className="comm-eq-side">
-                    <span>T₁ ∘ T₂ (T₂ applied first):</span>
-                    <strong>E_({aff12.a}, {aff12.b})</strong>
-                    <small>3·(5x + 7) + 2 = 15x + 23 mod 26</small>
-                  </div>
-                </div>
-                <p className="comm-summary">
-                  Since <MathView math="E_{15, 17} \ne E_{15, 23}" />, composition order cannot be interchanged.
-                  The affine transformation group is non-abelian.
-                </p>
-              </div>
-            )}
-
-            {commSystem === "permutation" && (
-              <div className="comm-panel-card">
-                <div className="comm-status-badge no">NON-COMMUTATIVE: P ∘ Q ≠ Q ∘ P</div>
-                <p>
-                  Computed from mathematical engine for <MathView math="P = [2, 1, 3, 4]" /> (swap pos 1,2)
-                  and <MathView math="Q = [1, 3, 2, 4]" /> (swap pos 2,3) on <strong>ABCD</strong>:
-                </p>
-                <div className="comm-split-equations">
-                  <div className="comm-eq-side">
-                    <span>P ∘ Q (Q applied first):</span>
-                    <strong>{permutationApply(pqPreset, "ABCD")}</strong>
-                    <small>Permutation: {permutationLabel(pqPreset)}</small>
-                  </div>
-                  <div className="comm-vs-badge">≠</div>
-                  <div className="comm-eq-side">
-                    <span>Q ∘ P (P applied first):</span>
-                    <strong>{permutationApply(qpPreset, "ABCD")}</strong>
-                    <small>Permutation: {permutationLabel(qpPreset)}</small>
-                  </div>
-                </div>
-                <p className="comm-summary">
-                  Because <MathView math="\mathrm{CABD} \ne \mathrm{BCAD}" />, <MathView math="S_4" /> is strictly non-abelian.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ===================================================================== */}
-      {/* SECTION F: Concept Map & What Group Theory Establishes                 */}
-      {/* ===================================================================== */}
-      <section className="structure-card visual-card" id="section-limits">
-        <div className="card-kicker">SECTION F ◈ SCIENTIFIC RESPONSIBILITY & CONCEPT MAP</div>
-        <h2 className="section-title">The Unified Concept Map</h2>
-        <p className="lead-paragraph">
-          How reversible transformations, bijections, group axioms, and algebraic structures form a coherent hierarchy.
-        </p>
-
-        {/* Visual Concept Map */}
-        <div className="concept-map-container">
-          <div className="concept-node">
-            <span className="node-num">01</span>
-            <strong>Reversible Transformations</strong>
-            <small>Mappings T : X → X where every message has a trail.</small>
-          </div>
-          <div className="concept-link-arrow">→</div>
-          <div className="concept-node">
-            <span className="node-num">02</span>
-            <strong>Bijective Mappings</strong>
-            <small>One-to-one and onto. Zero collisions; unique inverses.</small>
-          </div>
-          <div className="concept-link-arrow">→</div>
-          <div className="concept-node">
-            <span className="node-num">03</span>
-            <strong>Composition & Inverses</strong>
-            <small>Combining successive keys and recovering original states.</small>
-          </div>
-          <div className="concept-link-arrow">→</div>
-          <div className="concept-node">
-            <span className="node-num">04</span>
-            <strong>Group Axioms</strong>
-            <small>Closure, Associativity, Identity, and Inverses.</small>
-          </div>
-          <div className="concept-link-arrow">→</div>
-          <div className="concept-node accent-node">
-            <span className="node-num">05</span>
-            <strong>Algebraic Structure</strong>
-            <small>C₂₆ (cyclic), G_aff (affine), S₄ (permutations).</small>
-          </div>
-        </div>
-
-        {/* Dual Panel: What is Established vs What is NOT Established */}
-        <div className="limits-grid">
-          <div className="limits-box establishes">
-            <h4>What Abstract Algebra Rigorously Establishes</h4>
-            <ul className="limits-list">
+          <div className="takeaway-col">
+            <h3 className="takeaway-col-title establishes-title">Rigorously established</h3>
+            <ul className="takeaway-list">
               <li>
-                <strong>Error-Free Reversibility:</strong> Proves that every validly encrypted message can be recovered uniquely and deterministically without information loss.
+                <strong>Exact reversibility.</strong> Every validly encrypted message has a unique, deterministic decryption — no information is lost.
               </li>
               <li>
-                <strong>Composition Closure:</strong> Establishes that multiple encryptions within the system never escape the group&apos;s transformation space.
+                <strong>Closure under composition.</strong> Combining multiple valid keys never escapes the group's transformation space.
               </li>
               <li>
-                <strong>Finite Cycle Bounds:</strong> By Lagrange&apos;s theorem, guarantees that repeated application of any key eventually returns to the identity transformation.
+                <strong>Subgroup relationship.</strong> <MathView math="C_{26} \trianglelefteq G_{\mathrm{aff}}" /> — Caesar is a normal cyclic subgroup of the Affine group.
               </li>
               <li>
-                <strong>Subgroup Hierarchies:</strong> Formally demonstrates that the Caesar shift cipher is a normal cyclic subgroup of the affine group: <MathView math="C_{26} \triangleleft G_{\mathrm{aff}}" />.
+                <strong>Finite cycle bounds.</strong> By Lagrange's theorem, repeated application of any key eventually returns to the identity.
               </li>
             </ul>
           </div>
 
-          <div className="limits-box limitations">
-            <h4>What Group Structure Does NOT Establish</h4>
-            <ul className="limits-list">
+          <div className="takeaway-col">
+            <h3 className="takeaway-col-title not-title">Not established</h3>
+            <ul className="takeaway-list not-list">
               <li>
-                <strong>NOT Modern Cryptographic Security:</strong> Having a group structure does <em>not</em> imply resistance against cryptanalysis. In fact, classical group closure means multi-encryption provides zero extra security (<MathView math="E_{k_2} \circ E_{k_1} = E_{k_3}" />).
+                <strong>Cryptographic security.</strong> Group closure means multi-encryption gives zero keyspace advantage: <MathView math="E_{k_2} \circ E_{k_1} = E_{k_3}" />.
               </li>
               <li>
-                <strong>Trivial Keyspace Exhaustion:</strong> The keyspaces (<MathView math="|C_{26}|=26" />, <MathView math="|G_{\mathrm{aff}}|=312" />, <MathView math="|S_4|=24" />) can be searched exhaustively on modern hardware in less than one millisecond.
+                <strong>Resistance to analysis.</strong> Caesar and Affine preserve letter frequencies. S₄ preserves block frequencies. Both are trivially broken by frequency analysis.
               </li>
               <li>
-                <strong>Vulnerability to Frequency Analysis:</strong> Caesar and Affine maps preserve letter frequency distributions identically; <MathView math="S_4" /> preserves global letter frequencies across blocks.
-              </li>
-              <li>
-                <strong>Educational vs. Production Scope:</strong> These transformation systems are pedagogical models designed to illuminate algebraic mechanics, not modern cryptographic protocols like AES-GCM or RSA.
+                <strong>Large keyspaces.</strong> |C₂₆| = 26, |G_aff| = 312, |S₄| = 24. All exhaustively searchable in microseconds.
               </li>
             </ul>
           </div>
+
+        </div>
+
+        {/* ============================================================= */}
+        {/* SECTION G — Summary Chain                                      */}
+        {/* ============================================================= */}
+        <div className="summary-chain">
+          {[
+            { n: "01", label: "Reversible Bijections", sub: "T : X → X, no collisions" },
+            { n: "02", label: "Closure & Inverses", sub: "stay inside G; undo exactly" },
+            { n: "03", label: "Four Axioms Satisfied", sub: "closure, assoc., identity, inverses" },
+            { n: "04", label: "Algebraic Group (G, ∘)", sub: "C₂₆, G_aff, or S₄" },
+          ].map((item, i, arr) => (
+            <div key={i} className="chain-item-wrap">
+              <div className="chain-item">
+                <span className="chain-num">{item.n}</span>
+                <strong className="chain-label">{item.label}</strong>
+                <small className="chain-sub">{item.sub}</small>
+              </div>
+              {i < arr.length - 1 && <div className="chain-arrow">→</div>}
+            </div>
+          ))}
         </div>
       </section>
+
+      {/* ================================================================== */}
+      {/* SECTION H — One Structure, Three Transformation Systems (new)      */}
+      {/* ================================================================== */}
+      <section id="sec-unified" className="struc-section">
+        <SectionEyebrow label="07 · One Framework, Three Systems" />
+        <h2 className="struc-h2">One algebraic structure.<br /><em>Three different realizations.</em></h2>
+        <p className="struc-lead">
+          Abstract algebra does not care whether you are shifting letters, scaling them
+          by a modular multiplier, or scrambling their positions. If the transformation set
+          satisfies four axioms, it is a group. Here is the complete argument.
+        </p>
+
+        {/* A — Each system is a set of transformations */}
+        <div className="unified-subsection">
+          <div className="unified-sub-header">
+            <span className="unified-sub-tag">A</span>
+            <h3 className="unified-sub-title">Each system is a set of transformations</h3>
+          </div>
+          <p className="unified-sub-body">
+            The elements of each system are not individual letters or numbers — they are
+            <strong> transformation functions</strong> that act on a finite message space.
+          </p>
+          <div className="unified-trio">
+            <div className="unified-trio-card violet-card">
+              <span className="trio-label">Caesar</span>
+              <p className="trio-body">26 shift functions <MathView math="E_k : \mathbb{Z}_{26} \to \mathbb{Z}_{26}" />, one per valid offset
+                <MathView math="k \in \{0,1,\ldots,25\}" />.
+              </p>
+            </div>
+            <div className="unified-trio-card blue-card">
+              <span className="trio-label">Affine</span>
+              <p className="trio-body">312 invertible affine maps
+                <MathView math="E_{a,b} : \mathbb{Z}_{26} \to \mathbb{Z}_{26}" />, one per valid pair
+                <MathView math="(a,b)" /> with <MathView math="\gcd(a,26)=1" />.
+              </p>
+            </div>
+            <div className="unified-trio-card silver-card">
+              <span className="trio-label">S₄</span>
+              <p className="trio-body">24 bijective reorderings of four positions,
+                <MathView math="\sigma : \{1,2,3,4\} \to \{1,2,3,4\}" />. Each permutation is itself the transformation key.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* B — Each transformation is reversible */}
+        <div className="unified-subsection">
+          <div className="unified-sub-header">
+            <span className="unified-sub-tag">B</span>
+            <h3 className="unified-sub-title">Each transformation is reversible</h3>
+          </div>
+          <p className="unified-sub-body">
+            Every valid transformation is a <strong>bijection</strong> — a one-to-one, onto function
+            on a finite domain. Because it is a bijection, it has a unique inverse.
+          </p>
+          <div className="unified-trio">
+            <div className="unified-trio-card violet-card">
+              <span className="trio-label">Caesar</span>
+              <p className="trio-body">
+                Shift by <MathView math="+k" /> is undone by shift by <MathView math="-k \bmod 26" />.
+                No two distinct plaintext letters map to the same ciphertext letter.
+              </p>
+              <div className="trio-math"><MathView math="E_k^{-1} = E_{(26-k)\bmod 26}" display /></div>
+            </div>
+            <div className="unified-trio-card blue-card">
+              <span className="trio-label">Affine</span>
+              <p className="trio-body">
+                The map <MathView math="E_{a,b}(x)=(ax+b)\bmod 26" /> is invertible exactly when <MathView math="\gcd(a,26)=1" />,
+                ensuring <MathView math="a" /> has a multiplicative inverse mod 26.
+              </p>
+              <div className="trio-math"><MathView math="E_{a,b}^{-1}(y) = a^{-1}(y-b)\bmod 26" display /></div>
+            </div>
+            <div className="unified-trio-card silver-card">
+              <span className="trio-label">S₄</span>
+              <p className="trio-body">
+                Every permutation <MathView math="\sigma" /> of four positions is by definition a bijection.
+                Its inverse <MathView math="\sigma^{-1}" /> swaps source and destination indices.
+              </p>
+              <div className="trio-math"><MathView math="\sigma^{-1}(\sigma(x)) = x \;\forall x" display /></div>
+            </div>
+          </div>
+        </div>
+
+        {/* C — Composition is the shared operation */}
+        <div className="unified-subsection">
+          <div className="unified-sub-header">
+            <span className="unified-sub-tag">C</span>
+            <h3 className="unified-sub-title">Composition is the shared binary operation</h3>
+          </div>
+          <p className="unified-sub-body">
+            Two transformations can be <strong>composed</strong>: apply one, then apply the other.
+            The convention throughout this project is that the <em>rightmost function acts first</em>:
+            <MathView math="(T_2 \circ T_1)(x) = T_2(T_1(x))" />.
+          </p>
+          <div className="unified-comp-grid">
+            <div className="comp-rule-card">
+              <span className="comp-rule-label">Caesar composition</span>
+              <div className="comp-rule-math">
+                <MathView math="E_{k_2} \circ E_{k_1} = E_{(k_1+k_2)\bmod 26}" display />
+              </div>
+              <p className="comp-rule-note">Composing two shifts produces a shift — the composed key is simply the sum mod 26.</p>
+            </div>
+            <div className="comp-rule-card">
+              <span className="comp-rule-label">Affine composition</span>
+              <div className="comp-rule-math">
+                <MathView math="E_{a,b} \circ E_{c,d} = E_{ac \bmod 26,\; (ad+b)\bmod 26}" display />
+              </div>
+              <p className="comp-rule-note">The outer multiplier scales the inner shift. Order matters — this group is non-Abelian.</p>
+            </div>
+            <div className="comp-rule-card">
+              <span className="comp-rule-label">S₄ composition</span>
+              <div className="comp-rule-math">
+                <MathView math="(\tau \circ \sigma)(i) = \tau(\sigma(i))" display />
+              </div>
+              <p className="comp-rule-note">Composing two valid permutations of four positions produces another valid permutation in S₄.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* D — The four group axioms */}
+        <div className="unified-subsection">
+          <div className="unified-sub-header">
+            <span className="unified-sub-tag">D</span>
+            <h3 className="unified-sub-title">The four group axioms — why they hold</h3>
+          </div>
+          <p className="unified-sub-body">
+            A set of transformations with a binary operation forms an algebraic <strong>group</strong> exactly
+            when the following four properties hold. All three systems satisfy each one.
+          </p>
+          <div className="axiom-explanation-grid">
+            <div className="axiom-exp-card">
+              <span className="axiom-exp-num">01</span>
+              <h4 className="axiom-exp-name">Closure</h4>
+              <p className="axiom-exp-body">
+                Composing two valid transformations produces another valid transformation
+                in the same system. For Caesar: <MathView math="E_a \circ E_b = E_{(a+b)\bmod 26} \in C_{26}" />.
+                For Affine: the product of two coprime-to-26 multipliers is still coprime to 26.
+                For S₄: composing two bijections on {"{1,2,3,4}"} gives another bijection on {"{1,2,3,4}"}.
+              </p>
+              <div className="axiom-exp-consequence">
+                <strong>Cryptographic consequence:</strong> Multi-encryption with classical keys collapses
+                into a single equivalent key — no keyspace expansion is possible.
+              </div>
+            </div>
+            <div className="axiom-exp-card">
+              <span className="axiom-exp-num">02</span>
+              <h4 className="axiom-exp-name">Associativity</h4>
+              <p className="axiom-exp-body">
+                The grouping of sequential transformations does not change the outcome.
+                <MathView math="(T_3 \circ T_2) \circ T_1 = T_3 \circ (T_2 \circ T_1)" /> for all three systems.
+                This is inherited from function composition itself — no separate proof is needed for each system.
+              </p>
+              <div className="axiom-exp-consequence">
+                <strong>Cryptographic consequence:</strong> Decryption pipelines can reorganise intermediate
+                steps without changing the result.
+              </div>
+            </div>
+            <div className="axiom-exp-card">
+              <span className="axiom-exp-num">03</span>
+              <h4 className="axiom-exp-name">Identity</h4>
+              <p className="axiom-exp-body">
+                A transformation that leaves every input unchanged exists in each system.
+                Caesar: <MathView math="E_0(x) = x" />. Affine: <MathView math="E_{1,0}(x) = x" />.
+                S₄: the identity permutation <MathView math="[1,2,3,4]" /> leaves all positions unchanged.
+              </p>
+              <div className="axiom-exp-consequence">
+                <strong>Cryptographic consequence:</strong> The identity is the algebraic baseline
+                against which <MathView math="T^{-1} \circ T = e" /> is verified.
+              </div>
+            </div>
+            <div className="axiom-exp-card">
+              <span className="axiom-exp-num">04</span>
+              <h4 className="axiom-exp-name">Inverses</h4>
+              <p className="axiom-exp-body">
+                Every transformation has a unique inverse in the same system.
+                Caesar: subtract the shift mod 26.
+                Affine: the inverse exists because <MathView math="\gcd(a,26)=1" /> guarantees a
+                multiplicative inverse for <MathView math="a" /> mod 26, making <MathView math="E_{a,b}^{-1}" /> well-defined.
+                S₄: every bijection on a finite set has an inverse bijection.
+              </p>
+              <div className="axiom-exp-consequence">
+                <strong>Cryptographic consequence:</strong> Decryption is guaranteed without information loss.
+                For Affine, this is why <MathView math="\gcd(a,26)=1" /> is mandatory — without it, no inverse exists.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* E — Important differences */}
+        <div className="unified-subsection">
+          <div className="unified-sub-header">
+            <span className="unified-sub-tag">E</span>
+            <h3 className="unified-sub-title">Important differences between the systems</h3>
+          </div>
+          <p className="unified-sub-body">
+            Sharing a group structure does not make the three systems identical.
+            Their domains, orders, internal structures, and commutativity all differ.
+          </p>
+          <div className="diff-comparison-cards">
+            <div className="diff-comp-card">
+              <span className="diff-comp-tag violet">Caesar C₂₆</span>
+              <ul className="diff-comp-list">
+                <li><strong>Order:</strong> 26 (one element per shift value 0–25)</li>
+                <li><strong>Structure:</strong> Cyclic group, isomorphic to <MathView math="(\mathbb{Z}_{26},+)" /></li>
+                <li><strong>Commutativity:</strong> Strictly <em>Abelian</em> — shifts always commute</li>
+                <li><strong>Domain:</strong> Individual letter residues in <MathView math="\mathbb{Z}_{26}" /></li>
+              </ul>
+            </div>
+            <div className="diff-comp-card">
+              <span className="diff-comp-tag blue">Affine G_aff</span>
+              <ul className="diff-comp-list">
+                <li><strong>Order:</strong> 312 (12 valid multipliers × 26 shifts)</li>
+                <li><strong>Structure:</strong> Semidirect product <MathView math="\mathbb{Z}_{26} \rtimes \mathbb{Z}_{26}^\times" /></li>
+                <li><strong>Commutativity:</strong> <em>Non-Abelian</em> in general — order of composition matters</li>
+                <li><strong>Domain:</strong> Individual letter residues in <MathView math="\mathbb{Z}_{26}" /></li>
+              </ul>
+            </div>
+            <div className="diff-comp-card">
+              <span className="diff-comp-tag silver">Permutations S₄</span>
+              <ul className="diff-comp-list">
+                <li><strong>Order:</strong> 24 (= 4! permutations of four positions)</li>
+                <li><strong>Structure:</strong> Full symmetric group on four elements</li>
+                <li><strong>Commutativity:</strong> <em>Non-Abelian</em> — transpositions generally do not commute</li>
+                <li><strong>Domain:</strong> 4-position index set <MathView math="\{1,2,3,4\}" /></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* F — What the comparison teaches */}
+        <div className="unified-subsection">
+          <div className="unified-sub-header">
+            <span className="unified-sub-tag">F</span>
+            <h3 className="unified-sub-title">What the comparison teaches us</h3>
+          </div>
+          <p className="unified-sub-body">
+            By placing all three systems inside the same algebraic framework, abstract algebra lets
+            us reason about their common and distinct properties through a single set of concepts.
+          </p>
+          <div className="unified-teaching-grid">
+            <div className="teaching-point">
+              <span className="teaching-icon">◈</span>
+              <div>
+                <strong className="teaching-title">Verify reversibility structurally</strong>
+                <p className="teaching-body">
+                  Instead of testing every possible plaintext individually, we prove that the transformation
+                  set satisfies the inverse axiom — and reversibility follows for the entire system at once.
+                </p>
+              </div>
+            </div>
+            <div className="teaching-point">
+              <span className="teaching-icon">◈</span>
+              <div>
+                <strong className="teaching-title">Reason about compositions without exhaustive testing</strong>
+                <p className="teaching-body">
+                  The closure and associativity axioms let us determine how chained transformations
+                  behave without inspecting character-level output for every key combination.
+                </p>
+              </div>
+            </div>
+            <div className="teaching-point">
+              <span className="teaching-icon">◈</span>
+              <div>
+                <strong className="teaching-title">Identify identities and inverses algebraically</strong>
+                <p className="teaching-body">
+                  Group theory gives us formulas for the identity and inverse of each system.
+                  For Affine, the inverse formula <MathView math="E_{a^{-1},\,-a^{-1}b}" /> is derived directly
+                  from the group axioms, not by trial and error.
+                </p>
+              </div>
+            </div>
+            <div className="teaching-point">
+              <span className="teaching-icon">◈</span>
+              <div>
+                <strong className="teaching-title">Compare group order and commutativity</strong>
+                <p className="teaching-body">
+                  <MathView math="|C_{26}| = 26" />, <MathView math="|G_{\mathrm{aff}}| = 312" />, <MathView math="|S_4| = 24" />.
+                  Different finite orders immediately rule out isomorphism between the systems,
+                  and we can determine from commutativity whether key order matters without computing examples.
+                </p>
+              </div>
+            </div>
+            <div className="teaching-point">
+              <span className="teaching-icon">◈</span>
+              <div>
+                <strong className="teaching-title">Build shared verification procedures</strong>
+                <p className="teaching-body">
+                  The mathematical engine in this project uses the same round-trip test
+                  <MathView math="T^{-1}(T(x)) = x" /> for all three systems because the inverse axiom
+                  guarantees it holds universally across every group element.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Security limitation — prominent */}
+          <div className="unified-security-notice">
+            <span className="warn-icon">⚠</span>
+            <div className="warn-content">
+              <strong>Crucial limitation: group structure does not imply modern cryptographic security.</strong>
+              <p>
+                These are classical mathematical transformations studied for their algebraic structure,
+                not for confidentiality. Group closure means multi-encryption collapses into a single
+                equivalent key with zero keyspace gain. Caesar and Affine preserve letter frequencies;
+                S₄ preserves block-letter frequencies. All three are trivially broken by frequency analysis.
+                Modern ciphers (e.g., AES) deliberately avoid closed low-order algebraic groups across
+                their complete round structure, using non-linear operations over
+                <MathView math="\mathrm{GF}(2^8)" /> to resist algebraic attacks.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
     </div>
   );
 }

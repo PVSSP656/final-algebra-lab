@@ -654,6 +654,8 @@ function Lab(props: {
             plaintext={message}
             ciphertext={output}
             system={system}
+            affineKey={affine}
+            permKey={permutation}
           />
           <LabCalculations
             system={system}
@@ -866,8 +868,8 @@ type TeamMember = {
 const teamMembers: TeamMember[] = [
   {
     id: "project-lead",
-    name: "P. V. S. Subramanya Prasad",
-    registrationNumber: "Registration number not added",
+    name: "P.V.S. Subramanya Prasad",
+    registrationNumber: "24MMI0011",
     role: "Project Lead & Technical Lead",
     responsibilities: [
       "Overall project architecture and technical direction.",
@@ -878,64 +880,60 @@ const teamMembers: TeamMember[] = [
       "Code review and coordination of implementation work.",
       "Final integration, responsive behavior, and deployment coordination.",
     ],
-    image: "/images/team/project-lead.svg",
-    imageAlt: "Portrait placeholder for P. V. S. Subramanya Prasad",
-  },
-  {
-    id: "pavani",
-    name: "Pavani",
-    registrationNumber: "Registration number not added",
-    role: "Research & Academic Writing",
-    responsibilities: [
-      "Research paper and literature review.",
-      "References and academic writing.",
-    ],
-    image: "/images/team/pavani.svg",
-    imageAlt: "Portrait placeholder for Pavani",
-  },
-  {
-    id: "varun",
-    name: "Varun",
-    registrationNumber: "Registration number not added",
-    role: "Mathematical Verification & QA",
-    responsibilities: [
-      "Independent mathematical verification and expected results.",
-      "Testing and quality assurance.",
-    ],
-    image: "/images/team/varun.svg",
-    imageAlt: "Portrait placeholder for Varun",
+    image: "/images/team/pvssp.jpg",
+    imageAlt: "P.V.S. Subramanya Prasad, Project Lead & Technical Lead",
   },
   {
     id: "ananya",
-    name: "Ananya",
-    registrationNumber: "Registration number not added",
+    name: "Ananya Anand",
+    registrationNumber: "24MMI0010",
     role: "Presentation & Explanation",
     responsibilities: [
       "Presentation and plain-language explanations.",
       "Demonstration script and viva preparation.",
     ],
-    image: "/images/team/ananya.svg",
-    imageAlt: "Portrait placeholder for Ananya",
+    image: "/images/team/ananya.jpg",
+    imageAlt: "Ananya Anand, Presentation & Explanation",
   },
   {
     id: "dotto",
-    name: "Dotto",
-    registrationNumber: "Registration number not added",
+    name: "Aditya Datta",
+    registrationNumber: "24MMI0013",
     role: "Usability & Documentation Support",
     responsibilities: [
       "Usability testing and reproducible bug reports.",
       "Quality assurance and documentation support.",
     ],
-    image: "/images/team/dotto.svg",
-    imageAlt: "Portrait placeholder for Dotto",
+    image: "/images/team/dotto05.jpg",
+    imageAlt: "Aditya Datta, Usability & Documentation Support",
+  },
+  {
+    id: "varun",
+    name: "Varun Raaj",
+    registrationNumber: "24MMI0009",
+    role: "Mathematical Verification & QA",
+    responsibilities: [
+      "Independent mathematical verification and expected results.",
+      "Testing and quality assurance.",
+    ],
+    image: "/images/team/varun.jpg",
+    imageAlt: "Varun Raaj, Mathematical Verification & QA",
+  },
+  {
+    id: "pavani",
+    name: "Pavani Durga C",
+    registrationNumber: "24MMI0020",
+    role: "Team Member",
+    responsibilities: [
+      "Team member and research contributor.",
+    ],
+    image: "/images/team/pavani.jpg",
+    imageAlt: "Pavani Durga C, Team Member",
   },
 ];
 
 function Team() {
   const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-
-  const displayedId = hoveredId ?? pinnedId;
 
   const togglePin = (id: string) => {
     setPinnedId((current) => (current === id ? null : id));
@@ -955,30 +953,22 @@ function Team() {
       >
         <p>
           A collaborative research tool is itself a small system: distinct
-          roles, shared conventions, one verified result. Hover to preview a profile,
-          click to pin it open, and click again to close.
+          roles, shared conventions, one verified result. Click a profile to
+          open it, then click again to close it.
         </p>
       </PageIntro>
 
       {/* Vertical Member Profiles Stack */}
       <div className="team-vertical-list" role="region" aria-label="Team member profiles">
         {teamMembers.map((member, index) => {
-          const isPinned = pinnedId === member.id;
-          const isDisplayed = displayedId === member.id;
+          const isOpen = pinnedId === member.id;
           return (
             <VerticalTeamRow
               key={member.id}
               member={member}
               number={`0${index + 1}`}
-              isPinned={isPinned}
-              isDisplayed={isDisplayed}
-              onTogglePin={() => togglePin(member.id)}
-              onHoverStart={() => setHoveredId(member.id)}
-              onHoverEnd={() => setHoveredId(null)}
-              onClose={() => {
-                setPinnedId(null);
-                setHoveredId(null);
-              }}
+              isOpen={isOpen}
+              onToggle={() => togglePin(member.id)}
             />
           );
         })}
@@ -991,6 +981,25 @@ function Team() {
           understandable, comparable and testable.
         </p>
       </div>
+
+      {/* GitHub Project CTA */}
+      <section className="team-cta-section">
+        <div className="team-cta-inner">
+          <p className="eyebrow">OPEN SOURCE</p>
+          <h2>Explore the Project</h2>
+          <p className="team-cta-description">
+            Explore the implementation, inspect the mathematical experiments, and follow the development of Abstract Algebra Lab on GitHub.
+          </p>
+          <a
+            href="https://github.com/PVSSP656/final-algebra-lab"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="team-cta-button"
+          >
+            View Project on GitHub <span>↗</span>
+          </a>
+        </div>
+      </section>
     </div>
   );
 }
@@ -998,21 +1007,13 @@ function Team() {
 function VerticalTeamRow({
   member,
   number,
-  isPinned,
-  isDisplayed,
-  onTogglePin,
-  onHoverStart,
-  onHoverEnd,
-  onClose,
+  isOpen,
+  onToggle,
 }: {
   member: TeamMember;
   number: string;
-  isPinned: boolean;
-  isDisplayed: boolean;
-  onTogglePin: () => void;
-  onHoverStart: () => void;
-  onHoverEnd: () => void;
-  onClose: () => void;
+  isOpen: boolean;
+  onToggle: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const initials = member.name
@@ -1021,39 +1022,38 @@ function VerticalTeamRow({
     .join("")
     .slice(0, 2);
 
+  const panelId = `team-profile-${member.id}`;
+
   return (
     <article
-      className={`team-vertical-card ${isDisplayed ? "open" : ""} ${isPinned ? "pinned" : ""}`}
-      onMouseEnter={onHoverStart}
-      onMouseLeave={onHoverEnd}
+      className={`team-vertical-card ${isOpen ? "open" : ""}`}
     >
-      <div
+      <button
+        type="button"
         className="team-row-summary"
-        onClick={onTogglePin}
-        role="button"
-        tabIndex={0}
-        aria-expanded={isDisplayed}
-        aria-label={`${member.name}, ${member.role}. ${isPinned ? "Pinned open. Click to unpin." : "Click to pin profile open."}`}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onTogglePin();
-          }
-        }}
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
       >
         <div className="team-summary-left">
-          <div className="team-avatar-container">
+          <div className="team-avatar-container" aria-hidden="true">
             {imageFailed ? (
-              <span className="portrait-placeholder" aria-hidden="true">{initials}</span>
+              <span className="team-initials-fallback">{initials}</span>
             ) : (
-              <img src={member.image} alt={member.imageAlt} onError={() => setImageFailed(true)} />
+              <img
+                src={member.image}
+                alt=""
+                onError={() => setImageFailed(true)}
+                loading="lazy"
+              />
             )}
           </div>
           <div className="team-summary-text">
             <div className="team-meta-tagline">
               <span className="team-member-number">{number}</span>
-              <span className={`team-pin-badge ${isPinned ? "is-pinned" : ""}`}>
-                {isPinned ? "PINNED OPEN" : isDisplayed ? "PREVIEW" : "CLICK TO PIN"}
+              <span className="team-member-reg-pill">Reg. {member.registrationNumber}</span>
+              <span className={`team-pin-badge ${isOpen ? "is-pinned" : ""}`}>
+                {isOpen ? "OPEN" : "CLICK TO OPEN"}
               </span>
             </div>
             <h3 className="team-member-name">{member.name}</h3>
@@ -1061,54 +1061,61 @@ function VerticalTeamRow({
           </div>
         </div>
 
-        <div className="team-action-hint">
+        <div className="team-action-hint" aria-hidden="true">
           <span className="action-hint-label">
-            {isPinned ? "Unpin" : "Details"}
+            {isOpen ? "Close" : "Details"}
           </span>
-          <span className="action-hint-icon" aria-hidden="true">
-            {isDisplayed ? "◀" : "▶"}
+          <span className="action-hint-icon">
+            {isOpen ? "−" : "+"}
           </span>
         </div>
-      </div>
+      </button>
 
       <AnimatePresence>
-        {isDisplayed && (
+        {isOpen && (
           <motion.div
             key={member.id}
-            className="team-slideout-details"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            onClick={(e) => e.stopPropagation()}
+            id={panelId}
+            className="team-expanded-profile"
+            role="region"
+            aria-label={`Profile details for ${member.name}`}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: "easeOut" }}
           >
-            <div className="details-header-row">
-              <div>
-                <span className="eyebrow">RESEARCH PROFILE / {number}</span>
-                <h4 className="details-heading">{member.name}</h4>
+            <div className="team-profile-content">
+              <div className="team-profile-photo-col">
+                <div className="team-profile-photo-frame">
+                  {imageFailed ? (
+                    <span className="team-profile-initials-fallback" aria-hidden="true">{initials}</span>
+                  ) : (
+                    <img
+                      src={member.image}
+                      alt={member.imageAlt}
+                      onError={() => setImageFailed(true)}
+                      loading="lazy"
+                    />
+                  )}
+                </div>
               </div>
-              <button
-                type="button"
-                className="details-close-btn"
-                onClick={onClose}
-                aria-label={`Close profile for ${member.name}`}
-              >
-                ✕
-              </button>
-            </div>
+              <div className="team-profile-details-col">
+                <span className="eyebrow">RESEARCH PROFILE / {number}</span>
+                <h4 className="team-profile-heading">{member.name}</h4>
+                <div className="team-profile-meta">
+                  <span className="team-profile-reg">Registration No. · {member.registrationNumber}</span>
+                  <strong className="team-profile-role">{member.role}</strong>
+                </div>
 
-            <div className="details-submeta">
-              <span className="details-reg-num">{member.registrationNumber}</span>
-              <strong className="details-role-highlight">{member.role}</strong>
-            </div>
-
-            <div className="details-responsibilities-box">
-              <span className="responsibilities-label">KEY RESPONSIBILITIES &amp; SCOPE</span>
-              <ul className="responsibilities-list">
-                {member.responsibilities.map((resp, i) => (
-                  <li key={i}>{resp}</li>
-                ))}
-              </ul>
+                <div className="team-profile-responsibilities">
+                  <span className="responsibilities-label">KEY RESPONSIBILITIES &amp; SCOPE</span>
+                  <ul className="responsibilities-list">
+                    {member.responsibilities.map((resp, i) => (
+                      <li key={i}>{resp}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
