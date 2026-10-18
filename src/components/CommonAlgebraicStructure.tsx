@@ -23,7 +23,7 @@ import {
 
 // ─── Section scroll navigation ──────────────────────────────────────────────
 
-type SectionTab = "overview" | "reversible" | "axioms" | "composition" | "compare" | "takeaway";
+type SectionTab = "overview" | "reversible" | "axioms" | "composition" | "compare" | "takeaway" | "unified";
 
 function scrollTo(id: string) {
   const el = document.getElementById(id);
@@ -68,6 +68,7 @@ export function CommonAlgebraicStructure() {
       ["sec-composition", "composition"],
       ["sec-compare", "compare"],
       ["sec-takeaway", "takeaway"],
+      ["sec-unified", "unified"],
     ];
     const obs = new IntersectionObserver(
       (entries) => {
@@ -297,6 +298,7 @@ export function CommonAlgebraicStructure() {
           ["composition", "Composition"],
           ["compare", "Commutativity"],
           ["takeaway", "Summary"],
+          ["unified", "Unified Framework"],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -538,12 +540,30 @@ export function CommonAlgebraicStructure() {
               </p>
               
               <ul className="sys-properties-list">
-                <li><strong>1. Transformation set:</strong> All 26 shifts <MathView math="C_{26} = \{E_k \mid k \in \mathbb{Z}_{26}\}" />, where <MathView math="E_k(x) = (x + k) \bmod 26" />.</li>
-                <li><strong>2. Binary operation:</strong> Composition of shifts, corresponding to modular addition of keys: <MathView math="E_{k_2} \circ E_{k_1} = E_{(k_1 + k_2) \bmod 26}" />.</li>
-                <li><strong>3. Identity element:</strong> Shift by zero <MathView math="E_0(x) = x" /> leaves all letters unchanged.</li>
-                <li><strong>4. Inverse element:</strong> Shift by <MathView math="-k \bmod 26 = (26 - k) \bmod 26" />, satisfying <MathView math="E_k^{-1} = E_{26-k}" />.</li>
-                <li><strong>5. Closure &amp; Associativity:</strong> Sum of integers mod 26 is closed; function composition is universally associative.</li>
-                <li><strong>6. Commutative (Abelian):</strong> Yes. <MathView math="E_{k_1} \circ E_{k_2} = E_{k_2} \circ E_{k_1}" /> because addition modulo 26 is commutative.</li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">1. Transformation set</span>
+                  <div className="sys-prop-desc">All 26 shifts <MathView math="C_{26} = \{E_k \mid k \in \mathbb{Z}_{26}\}" />, where <MathView math="E_k(x) = (x + k) \bmod 26" />.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">2. Binary operation</span>
+                  <div className="sys-prop-desc">Composition of shifts, corresponding to modular addition of keys: <MathView math="E_{k_2} \circ E_{k_1} = E_{(k_1 + k_2) \bmod 26}" />.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">3. Identity element</span>
+                  <div className="sys-prop-desc">Shift by zero <MathView math="E_0(x) = x" /> leaves all letters unchanged.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">4. Inverse element</span>
+                  <div className="sys-prop-desc">Shift by <MathView math="-k \bmod 26 = (26 - k) \bmod 26" />, satisfying <MathView math="E_k^{-1} = E_{26-k}" />.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">5. Closure &amp; Associativity</span>
+                  <div className="sys-prop-desc">Sum of integers mod 26 is closed; function composition is universally associative.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">6. Commutative (Abelian)</span>
+                  <div className="sys-prop-desc">Yes. <MathView math="E_{k_1} \circ E_{k_2} = E_{k_2} \circ E_{k_1}" /> because addition modulo 26 is commutative.</div>
+                </li>
               </ul>
 
               <div className="found-sys-math">
@@ -563,12 +583,30 @@ export function CommonAlgebraicStructure() {
               </p>
               
               <ul className="sys-properties-list">
-                <li><strong>1. Transformation set:</strong> <MathView math="G_{\mathrm{aff}} = \{E_{a,b} \mid a \in \mathbb{Z}_{26}^\times, b \in \mathbb{Z}_{26}\}" />. 12 units <MathView math="\times" /> 26 shifts = 312 transformations.</li>
-                <li><strong>2. Binary operation:</strong> Function composition (rightmost acts first): <MathView math="E_{a,b} \circ E_{c,d} = E_{ac \bmod 26, (ad + b) \bmod 26}" />.</li>
-                <li><strong>3. Identity element:</strong> Key <MathView math="(a=1, b=0)" />, yielding <MathView math="E_{1,0}(x) = (1{\cdot}x + 0) \bmod 26 = x" />.</li>
-                <li><strong>4. Inverse element:</strong> <MathView math="E_{a,b}^{-1}(y) = a^{-1}(y - b) \bmod 26 = E_{a^{-1}, -a^{-1}b \bmod 26}(y)" />, where <MathView math="a \cdot a^{-1} \equiv 1 \pmod{26}" />.</li>
-                <li><strong>5. Closure &amp; Associativity:</strong> Products of coprimes are coprime mod 26; composition of affine maps is closed and associative.</li>
-                <li><strong>6. Commutative (Abelian):</strong> No. The multiplier of the outer function scales the shift of the inner function, so order matters.</li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">1. Transformation set</span>
+                  <div className="sys-prop-desc"><MathView math="G_{\mathrm{aff}} = \{E_{a,b} \mid a \in \mathbb{Z}_{26}^\times, b \in \mathbb{Z}_{26}\}" />. 12 units <MathView math="\times" /> 26 shifts = 312 transformations.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">2. Binary operation</span>
+                  <div className="sys-prop-desc">Function composition (rightmost acts first): <MathView math="E_{a,b} \circ E_{c,d} = E_{ac \bmod 26, (ad + b) \bmod 26}" />.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">3. Identity element</span>
+                  <div className="sys-prop-desc">Key <MathView math="(a=1, b=0)" />, yielding <MathView math="E_{1,0}(x) = (1{\cdot}x + 0) \bmod 26 = x" />.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">4. Inverse element</span>
+                  <div className="sys-prop-desc"><MathView math="E_{a,b}^{-1}(y) = a^{-1}(y - b) \bmod 26 = E_{a^{-1}, -a^{-1}b \bmod 26}(y)" />, where <MathView math="a \cdot a^{-1} \equiv 1 \pmod{26}" />.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">5. Closure &amp; Associativity</span>
+                  <div className="sys-prop-desc">Products of coprimes are coprime mod 26; composition of affine maps is closed and associative.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">6. Commutative (Abelian)</span>
+                  <div className="sys-prop-desc">No. The multiplier of the outer function scales the shift of the inner function, so order matters.</div>
+                </li>
               </ul>
 
               <div className="found-sys-math">
@@ -588,12 +626,30 @@ export function CommonAlgebraicStructure() {
               </p>
               
               <ul className="sys-properties-list">
-                <li><strong>1. Transformation set:</strong> <MathView math="S_4 = \{\sigma \mid \sigma : \{1,2,3,4\} \to \{1,2,3,4\} \text{ bijective}\}" />, containing <MathView math="4! = 24" /> permutations.</li>
-                <li><strong>2. Binary operation:</strong> Permutation composition <MathView math="(\tau \circ \sigma)(x) = \tau(\sigma(x))" />, evaluating right-to-left.</li>
-                <li><strong>3. Identity element:</strong> The identity permutation <MathView math="[1,2,3,4]" /> leaving all four character positions unchanged.</li>
-                <li><strong>4. Inverse element:</strong> The inverse permutation <MathView math="\sigma^{-1}" /> swapping source and destination indices.</li>
-                <li><strong>5. Closure &amp; Associativity:</strong> Composing two permutations on 4 elements produces another permutation in <MathView math="S_4" />; composition is associative.</li>
-                <li><strong>6. Commutative (Abelian):</strong> No. Transpositions in <MathView math="S_4" /> do not commute in general: <MathView math="\tau \circ \sigma \ne \sigma \circ \tau" />.</li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">1. Transformation set</span>
+                  <div className="sys-prop-desc"><MathView math="S_4 = \{\sigma \mid \sigma : \{1,2,3,4\} \to \{1,2,3,4\} \text{ bijective}\}" />, containing <MathView math="4! = 24" /> permutations.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">2. Binary operation</span>
+                  <div className="sys-prop-desc">Permutation composition <MathView math="(\tau \circ \sigma)(x) = \tau(\sigma(x))" />, evaluating right-to-left.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">3. Identity element</span>
+                  <div className="sys-prop-desc">The identity permutation <MathView math="[1,2,3,4]" /> leaving all four character positions unchanged.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">4. Inverse element</span>
+                  <div className="sys-prop-desc">The inverse permutation <MathView math="\sigma^{-1}" /> swapping source and destination indices.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">5. Closure &amp; Associativity</span>
+                  <div className="sys-prop-desc">Composing two permutations on 4 elements produces another permutation in <MathView math="S_4" />; composition is associative.</div>
+                </li>
+                <li className="sys-prop-item">
+                  <span className="sys-prop-label">6. Commutative (Abelian)</span>
+                  <div className="sys-prop-desc">No. Transpositions in <MathView math="S_4" /> do not commute in general: <MathView math="\tau \circ \sigma \ne \sigma \circ \tau" />.</div>
+                </li>
               </ul>
 
               <div className="found-sys-math">
