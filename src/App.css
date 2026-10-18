@@ -794,6 +794,18 @@ h3 {
 .action-btn.decrypt-btn.active small {
   color: var(--ice);
 }
+.action-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none !important;
+  border-color: var(--line) !important;
+  box-shadow: none !important;
+}
+.action-btn:disabled:hover {
+  border-color: var(--line) !important;
+  color: var(--muted) !important;
+  transform: none !important;
+}
 .reset-button {
   width: 100%;
   background: rgba(255, 255, 255, 0.02);
