@@ -984,11 +984,11 @@ export function CommonAlgebraicStructure() {
           <div className="thesis-top-row">
             <div className="thesis-kicker">SHARED ALGEBRAIC STRUCTURE</div>
             <div className="thesis-headline">
-              Different transformations. Different domains. Shared group axioms.
+              Different Transformations. One Common Structure.
             </div>
           </div>
           <p className="thesis-subtext">
-            While each system operates over its own mathematical space, all three satisfy the identical formal requirements of a mathematical group.
+            Different transformations. Different domains. Shared group axioms. While each system operates over its own mathematical space, all three satisfy the identical formal requirements of a mathematical group.
             Their differences lie in their underlying sets, operations, and commutativity properties.
           </p>
 
@@ -1121,6 +1121,24 @@ export function CommonAlgebraicStructure() {
                 />
                 <span className="val-chip">{revCaesarShift}</span>
               </label>
+            </div>
+
+            {/* Dedicated Recovery Status & Cycle Trigger in normal layout flow */}
+            <div className="recovery-status-row">
+              <span className="recovery-status-indicator">
+                <i className="status-dot-live" />
+                <strong>Status:</strong> Ready — click &apos;Run Inverse Recovery Cycle&apos; or interact with keys
+              </span>
+              <button
+                type="button"
+                className="run-recovery-cycle-btn"
+                onClick={() => {
+                  setRevCaesarShift((prev) => (prev % 25) + 1);
+                }}
+                title="Step key to execute an inverse recovery cycle"
+              >
+                Run Inverse Recovery Cycle ↻
+              </button>
             </div>
 
             <div className="formula-box">

@@ -31,15 +31,15 @@ type Page =
   | "security"
   | "research";
 type System = "caesar" | "affine" | "permutation";
-const navItems: { id: Page; label: string; number: string }[] = [
-  { id: "home", label: "Overview", number: "00" },
-  { id: "foundations", label: "Foundations", number: "01" },
-  { id: "groups", label: "Group Explorer", number: "02" },
-  { id: "lab", label: "The Lab", number: "03" },
-  { id: "structure", label: "Algebraic Structure", number: "04" },
-  { id: "security", label: "Experiments", number: "05" },
-  { id: "team", label: "The Team", number: "06" },
-  { id: "research", label: "Research Log", number: "07" },
+const navItems: { id: Page; label: string }[] = [
+  { id: "home", label: "Overview" },
+  { id: "foundations", label: "Foundations" },
+  { id: "groups", label: "Group Explorer" },
+  { id: "lab", label: "The Lab" },
+  { id: "structure", label: "Algebraic Structure" },
+  { id: "security", label: "Experiments" },
+  { id: "team", label: "The Team" },
+  { id: "research", label: "Research Log" },
 ];
 const systemMeta: Record<
   System,
@@ -125,7 +125,6 @@ function App() {
               className={page === item.id ? "active" : ""}
               onClick={() => navigate(item.id)}
             >
-              <small>{item.number}</small>
               {item.label}
             </button>
           ))}
@@ -955,8 +954,8 @@ function Team() {
       >
         <p>
           A collaborative research tool is itself a small system: distinct
-          roles, shared conventions, one verified result. Hover to preview a profile,
-          click to pin it open, and click again to close.
+          roles, shared conventions, one verified result. Hover to explore a
+          profile.
         </p>
       </PageIntro>
 
@@ -1033,7 +1032,7 @@ function VerticalTeamRow({
         role="button"
         tabIndex={0}
         aria-expanded={isDisplayed}
-        aria-label={`${member.name}, ${member.role}. ${isPinned ? "Pinned open. Click to unpin." : "Click to pin profile open."}`}
+        aria-label={`${member.name}, ${member.role}. ${isPinned ? "Click to close profile." : "Click to open profile."}`}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -1052,9 +1051,7 @@ function VerticalTeamRow({
           <div className="team-summary-text">
             <div className="team-meta-tagline">
               <span className="team-member-number">{number}</span>
-              <span className={`team-pin-badge ${isPinned ? "is-pinned" : ""}`}>
-                {isPinned ? "PINNED OPEN" : isDisplayed ? "PREVIEW" : "CLICK TO PIN"}
-              </span>
+              {isPinned && <span className="team-pin-badge is-pinned">OPEN</span>}
             </div>
             <h3 className="team-member-name">{member.name}</h3>
             <span className="team-member-role-title">{member.role}</span>
@@ -1063,7 +1060,7 @@ function VerticalTeamRow({
 
         <div className="team-action-hint">
           <span className="action-hint-label">
-            {isPinned ? "Unpin" : "Details"}
+            {isPinned ? "Close" : "Details"}
           </span>
           <span className="action-hint-icon" aria-hidden="true">
             {isDisplayed ? "◀" : "▶"}
