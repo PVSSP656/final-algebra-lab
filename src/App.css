@@ -654,6 +654,27 @@ h3 {
   text-transform: uppercase;
   letter-spacing: 1px;
 }
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.field-action-btn {
+  background: none;
+  border: none;
+  color: var(--ice);
+  font: 10px var(--mono);
+  cursor: pointer;
+  padding: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.15s;
+}
+.field-action-btn:hover {
+  color: var(--white);
+  text-decoration: underline;
+}
 .field-label textarea,
 .lab-controls textarea,
 .field-label select,

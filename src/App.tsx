@@ -77,24 +77,21 @@ function App() {
   const [compareAffine, setCompareAffine] = useState<AffineKey>({ a: 3, b: 4 });
   const [menuOpen, setMenuOpen] = useState(false);
   const permutation = S4[permutationIndex];
-  const [s4Ciphertext, setS4Ciphertext] = useState<string>(() =>
-    permutationText(S4[13], "HELLO, ALGEBRA!", false)
-  );
   const output = useMemo(() => {
+    if (!message || message.trim().length === 0) {
+      return "";
+    }
     if (system === "caesar") {
       return caesarText(message, decrypt ? -shift : shift);
     }
     if (system === "affine") {
       return affineText(message, affine, decrypt);
     }
-    if (decrypt) {
-      if (!s4Ciphertext || s4Ciphertext.trim().length === 0) {
-        return "NO CIPHERTEXT TO DECRYPT — ENCRYPT A MESSAGE FIRST";
-      }
-      return permutationText(permutation, s4Ciphertext, true);
+    if (system === "permutation") {
+      return permutationText(permutation, message, decrypt);
     }
-    return permutationText(permutation, message, false);
-  }, [affine, decrypt, message, permutation, s4Ciphertext, shift, system]);
+    return "";
+  }, [affine, decrypt, message, permutation, shift, system]);
   const navigate = (next: Page) => {
     setPage(next);
     setMenuOpen(false);
@@ -176,8 +173,6 @@ function App() {
                 decrypt={decrypt}
                 setDecrypt={setDecrypt}
                 output={output}
-                s4Ciphertext={s4Ciphertext}
-                setS4Ciphertext={setS4Ciphertext}
               />
             )}
             {page === "groups" && (
@@ -461,8 +456,6 @@ function Lab(props: {
   decrypt: boolean;
   setDecrypt: (v: boolean) => void;
   output: string;
-  s4Ciphertext: string;
-  setS4Ciphertext: (v: string) => void;
 }) {
   const {
     system,
@@ -479,8 +472,6 @@ function Lab(props: {
     decrypt,
     setDecrypt,
     output,
-    s4Ciphertext,
-    setS4Ciphertext,
   } = props;
   const keyLabel =
     system === "caesar"
@@ -488,9 +479,7 @@ function Lab(props: {
       : system === "affine"
         ? `a = ${affine.a}, b = ${affine.b}`
         : permutationLabel(permutation);
-  const hasS4Ciphertext = Boolean(
-    s4Ciphertext && s4Ciphertext.trim().length > 0 && message.trim().length > 0
-  );
+  const hasValidInput = message.trim().length > 0;
   return (
     <div className="page-wrap lab-page">
       <PageIntro
@@ -519,42 +508,36 @@ function Lab(props: {
               <button
                 key={item}
                 className={system === item ? "selected" : ""}
-                onClick={() => {
-                  setSystem(item);
-                  if (item === "permutation") {
-                    setDecrypt(false);
-                    setS4Ciphertext(
-                      message.trim().length > 0
-                        ? permutationText(permutation, message, false)
-                        : ""
-                    );
-                  }
-                }}
+                onClick={() => setSystem(item)}
               >
                 {systemMeta[item].symbol}
               </button>
             ))}
           </div>
-          <label className="field-label" htmlFor="message">
-            Plaintext message
-          </label>
+          <div className="field-label-row">
+            <label className="field-label" htmlFor="message">
+              {decrypt ? "Ciphertext message" : "Plaintext message"}
+            </label>
+            {output && output.length > 0 && output !== message && (
+              <button
+                type="button"
+                className="field-action-btn"
+                onClick={() => setMessage(output)}
+                title="Copy output to input field"
+              >
+                ⇄ Use output as input
+              </button>
+            )}
+          </div>
           <textarea
             id="message"
             value={message}
-            onChange={(event) => {
-              const nextVal = event.target.value;
-              setMessage(nextVal);
-              if (system === "permutation") {
-                if (decrypt) {
-                  setDecrypt(false);
-                }
-                setS4Ciphertext(
-                  nextVal.trim().length > 0
-                    ? permutationText(permutation, nextVal, false)
-                    : ""
-                );
-              }
-            }}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder={
+              decrypt
+                ? "Enter ciphertext to decrypt..."
+                : "Enter plaintext to encrypt..."
+            }
           />
           <div className="control-divider" />
           {system === "caesar" && (
@@ -616,17 +599,9 @@ function Lab(props: {
               S₄ key
               <select
                 value={permutationIndex}
-                onChange={(event) => {
-                  const nextIdx = Number(event.target.value);
-                  setPermutationIndex(nextIdx);
-                  if (!decrypt) {
-                    setS4Ciphertext(
-                      message.trim().length > 0
-                        ? permutationText(S4[nextIdx], message, false)
-                        : ""
-                    );
-                  }
-                }}
+                onChange={(event) =>
+                  setPermutationIndex(Number(event.target.value))
+                }
               >
                 {S4.map((item, index) => (
                   <option value={index} key={item.join("")}>
@@ -640,17 +615,17 @@ function Lab(props: {
             <button
               type="button"
               className={`action-btn encrypt-btn ${!decrypt ? "active" : ""}`}
+              disabled={!hasValidInput}
               onClick={() => {
+                if (!hasValidInput) return;
                 setDecrypt(false);
-                if (system === "permutation") {
-                  setS4Ciphertext(
-                    message.trim().length > 0
-                      ? permutationText(permutation, message, false)
-                      : ""
-                  );
-                }
               }}
               aria-label="Encrypt message using forward transformation"
+              title={
+                !hasValidInput
+                  ? "Enter a message to encrypt"
+                  : "Encrypt message using forward transformation"
+              }
             >
               <span>Encrypt Message</span>
               <small>E(x) forward</small>
@@ -658,15 +633,15 @@ function Lab(props: {
             <button
               type="button"
               className={`action-btn decrypt-btn ${decrypt ? "active" : ""}`}
-              disabled={system === "permutation" && !hasS4Ciphertext}
+              disabled={!hasValidInput}
               onClick={() => {
-                if (system === "permutation" && !hasS4Ciphertext) return;
+                if (!hasValidInput) return;
                 setDecrypt(true);
               }}
               aria-label="Decrypt message using inverse transformation"
               title={
-                system === "permutation" && !hasS4Ciphertext
-                  ? "Generate ciphertext first by entering a message and clicking Encrypt"
+                !hasValidInput
+                  ? "Enter a message to decrypt"
                   : "Decrypt message using inverse transformation"
               }
             >
@@ -682,9 +657,6 @@ function Lab(props: {
               setAffine({ a: 5, b: 8 });
               setPermutationIndex(13);
               setDecrypt(false);
-              setS4Ciphertext(
-                permutationText(S4[13], "HELLO, ALGEBRA!", false)
-              );
             }}
           >
             Reset experiment
@@ -694,10 +666,8 @@ function Lab(props: {
           <div className="output-window">
             <div className="window-top">
               <span>
-                {system === "permutation"
-                  ? (decrypt ? "RECOVERED PLAINTEXT" : "CIPHERTEXT OUTPUT")
-                  : "OUTPUT"}{" "}
-                / {keyLabel}
+                {decrypt ? "RECOVERED PLAINTEXT" : "CIPHERTEXT OUTPUT"} /{" "}
+                {keyLabel}
               </span>
               <span className="window-live">
                 <i /> {decrypt ? "DECRYPTED (INVERSE)" : "ENCRYPTED (FORWARD)"}
@@ -716,18 +686,14 @@ function Lab(props: {
               </motion.div>
             </AnimatePresence>
             <div className="operation-path">
-              <span>
-                {decrypt
-                  ? (system === "permutation" && s4Ciphertext
-                      ? `CIPHERTEXT (${s4Ciphertext.length > 8 ? s4Ciphertext.slice(0, 8) + "…" : s4Ciphertext})`
-                      : "CIPHER TEXT")
-                  : "PLAIN TEXT"}
-              </span>
+              <span>{decrypt ? "CIPHER TEXT" : "PLAIN TEXT"}</span>
               <i>→</i>
               <strong>
                 {system === "permutation"
                   ? (decrypt ? "S₄⁻¹" : "S₄")
-                  : systemMeta[system].symbol}
+                  : system === "caesar"
+                    ? (decrypt ? "C₂₆⁻¹" : "C₂₆")
+                    : (decrypt ? "AGL(1, 26)⁻¹" : "AGL(1, 26)")}
               </strong>
               <i>→</i>
               <span>{decrypt ? "RECOVERED PLAIN TEXT" : "CIPHER TEXT"}</span>
@@ -736,19 +702,15 @@ function Lab(props: {
           <CipherWheel
             shift={shift}
             setShift={setShift}
-            plaintext={message}
-            ciphertext={system === "permutation" ? (s4Ciphertext || output) : output}
+            plaintext={decrypt ? output : message}
+            ciphertext={decrypt ? message : output}
             system={system}
             affineKey={affine}
             permKey={permutation}
           />
           <LabCalculations
             system={system}
-            message={
-              system === "permutation" && decrypt
-                ? (s4Ciphertext || "")
-                : message
-            }
+            message={message}
             output={output}
             shift={shift}
             affine={affine}
