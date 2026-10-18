@@ -195,7 +195,7 @@ export function CipherWheel({
   // Counter-rotation of the gyro tick ring
   const gyroRotation = -outerDeg * 1.5;
 
-  // Letter cards computation from plaintext input
+  // Letter cards computation from plaintext input: dynamic rendering of unique letters in first-appearance order
   const mappingCards = useMemo(() => {
     const cleanLetters = [...plaintext.toUpperCase()].filter((c) =>
       ALPHABET.includes(c)
@@ -204,20 +204,44 @@ export function CipherWheel({
       ALPHABET.includes(c)
     );
 
-    // Limit to first 8 characters for clean horizontal display
-    const sliceCount = Math.min(cleanLetters.length, 8);
-    return cleanLetters.slice(0, sliceCount).map((pChar, idx) => {
+    const seen = new Set<string>();
+    const cards: Array<{
+      index: number;
+      plain: string;
+      plainIdx: number;
+      cipher: string;
+      cipherIdx: number;
+    }> = [];
+
+    cleanLetters.forEach((pChar, idx) => {
+      if (seen.has(pChar)) {
+        return; // Preserves repeated-letter handling by representing each distinct letter once in first-appearance order
+      }
+      seen.add(pChar);
+
       const pIdx = ALPHABET.indexOf(pChar);
-      const cChar = outLetters[idx] ?? ALPHABET[(pIdx + shift) % 26]!;
-      return {
-        index: idx + 1,
+      let cChar = outLetters[idx];
+      if (!cChar || !ALPHABET.includes(cChar)) {
+        if (system === "caesar") {
+          cChar = ALPHABET[(pIdx + shift) % 26]!;
+        } else if (system === "affine" && effectiveAffine) {
+          cChar = ALPHABET[(effectiveAffine.a * pIdx + effectiveAffine.b) % 26]!;
+        } else {
+          cChar = ALPHABET[(pIdx + shift) % 26]!;
+        }
+      }
+
+      cards.push({
+        index: cards.length + 1,
         plain: pChar,
         plainIdx: pIdx,
         cipher: cChar,
         cipherIdx: ALPHABET.indexOf(cChar),
-      };
+      });
     });
-  }, [plaintext, ciphertext, shift]);
+
+    return cards;
+  }, [plaintext, ciphertext, shift, system, effectiveAffine]);
 
   // Card click handler: animate wheel to that card's letters
   function handleCardClick(
@@ -242,7 +266,10 @@ export function CipherWheel({
     : topOuterChar;
 
   const activeCipherChar = hoveredLetter
-    ? ALPHABET[(ALPHABET.indexOf(hoveredLetter) + shift) % 26]!
+    ? (mappingCards.find((c) => c.plain === hoveredLetter)?.cipher ??
+       (system === "affine" && effectiveAffine
+         ? ALPHABET[(effectiveAffine.a * ALPHABET.indexOf(hoveredLetter) + effectiveAffine.b) % 26]!
+         : ALPHABET[(ALPHABET.indexOf(hoveredLetter) + shift) % 26]!))
     : hoveredCardIndex != null && mappingCards[hoveredCardIndex]
     ? mappingCards[hoveredCardIndex].cipher
     : topInnerChar;
@@ -702,12 +729,18 @@ export function CipherWheel({
             (hoveredLetter === null && hoveredCardIndex === null && i === 0);
 
           return (
-            <div key={`card-${i}`} className="mapping-card-item-wrap">
+            <div key={`card-${card.plain}-${i}`} className="mapping-card-item-wrap">
               <div
                 className={`mapping-card-box ${isCardActive ? "card-active" : ""}`}
                 onMouseEnter={() => setHoveredCardIndex(i)}
                 onMouseLeave={() => setHoveredCardIndex(null)}
                 onClick={() => handleCardClick(card, i)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleCardClick(card, i);
+                  }
+                }}
                 tabIndex={0}
                 role="button"
                 aria-label={`Letter ${card.plain} maps to ${card.cipher}`}

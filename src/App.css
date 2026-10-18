@@ -8229,13 +8229,16 @@ footer {
 /* Letter-by-Letter Mapping Cards Tray */
 .wheel-mapping-cards-tray {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 16px 8px;
   overflow-x: auto;
-  padding: 20px 8px 6px;
+  padding: 20px 10px 12px;
   border-top: 1px solid rgba(173, 166, 211, 0.15);
   margin-top: 20px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .mapping-card-item-wrap {
   display: flex;
