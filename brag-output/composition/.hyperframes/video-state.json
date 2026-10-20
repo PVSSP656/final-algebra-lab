@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "historyId": "0f738850-c96e-4d3c-83ba-baebabc48a8c",
+  "currentRevision": "1b1d6ac5-872f-4be4-9222-93e7cd42a6ba",
+  "pendingChanges": false,
+  "files": {
+    "assets/sfx/click1.ogg": {
+      "hash": "59175ac17cd49a68dd736285738441287636112a84a6f7ce0d89921bda5a5360",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\59\\59175ac17cd49a68dd736285738441287636112a84a6f7ce0d89921bda5a5360"
+    },
+    "assets/sfx/rollover1.ogg": {
+      "hash": "4eb47e2e1540c44847b47a89825e21335c820a4e54cacf8c4c1eb5100e36af42",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\4e\\4eb47e2e1540c44847b47a89825e21335c820a4e54cacf8c4c1eb5100e36af42"
+    },
+    "assets/sfx/switch11.ogg": {
+      "hash": "a8d445bd96fe3842ff2dcdd42ae728330baa8928032ca5f3d5cd4b926929550a",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\a8\\a8d445bd96fe3842ff2dcdd42ae728330baa8928032ca5f3d5cd4b926929550a"
+    },
+    "assets/sfx/switch3.ogg": {
+      "hash": "75d87dc60b7d29df838530af8c9e28205102234e07b5f1e849aa3d95c3922bd0",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\75\\75d87dc60b7d29df838530af8c9e28205102234e07b5f1e849aa3d95c3922bd0"
+    },
+    "assets/team/ananya.jpg": {
+      "hash": "8fa423d23bcf939a419dc2880aea2ff394b21350a55296f31db5cfd130bdda81",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\8f\\8fa423d23bcf939a419dc2880aea2ff394b21350a55296f31db5cfd130bdda81"
+    },
+    "assets/team/dotto05.jpg": {
+      "hash": "f0949079e51a192fe9fdc5538004facbd4b8e4eae18d9f308bc6dd15d2312b56",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\f0\\f0949079e51a192fe9fdc5538004facbd4b8e4eae18d9f308bc6dd15d2312b56"
+    },
+    "assets/team/pavani.jpg": {
+      "hash": "e6ce4ceb30a5326007875949563ca032a090144f428f57b705c4c545a595fc66",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\e6\\e6ce4ceb30a5326007875949563ca032a090144f428f57b705c4c545a595fc66"
+    },
+    "assets/team/pvssp.jpg": {
+      "hash": "25b015e9b644da7ecd12affe0831c017e44fdbef3c343ec4f0e9101de521de07",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\25\\25b015e9b644da7ecd12affe0831c017e44fdbef3c343ec4f0e9101de521de07"
+    },
+    "assets/team/varun.jpg": {
+      "hash": "2ef9071f63fa9ca8467b93a28400ce9417e8d843f3eb3ef279403cbf24c3ffa6",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\2e\\2ef9071f63fa9ca8467b93a28400ce9417e8d843f3eb3ef279403cbf24c3ffa6"
+    },
+    "hyperframes.json": {
+      "hash": "53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\53\\53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50"
+    },
+    "index.html": {
+      "hash": "716095cb3d1967a2eeef685076a4fd340559d93687f13f436087ec2966a76928",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\71\\716095cb3d1967a2eeef685076a4fd340559d93687f13f436087ec2966a76928"
+    },
+    "meta.json": {
+      "hash": "3f89a1fce7c7425c87e995d216107c4e57c107837dad9c65f0c2170b97be5a34",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\3f\\3f89a1fce7c7425c87e995d216107c4e57c107837dad9c65f0c2170b97be5a34"
+    },
+    "package.json": {
+      "hash": "b0ee573c55ce1876e5bb23e39e97052273414f4d938bbe65b05a94cc0db14664",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\b0\\b0ee573c55ce1876e5bb23e39e97052273414f4d938bbe65b05a94cc0db14664"
+    },
+    "assets/music/bed.mp3": {
+      "hash": "364a546834db4c0c2e3b3240eb6df03e98b7362230154b04c5c614442f6660d7",
+      "content": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\36\\364a546834db4c0c2e3b3240eb6df03e98b7362230154b04c5c614442f6660d7"
+    }
+  },
+  "revisions": {
+    "117a9902-d7f4-4647-b22f-73dfd32b5686": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792406740633,
+      "endedAt": 1792406740634,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\37\\37b9b203e7e53e89b50110a6587ebab9c1cbf064998779bdef387e43f31358bc",
+          "after": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\e2\\e2579ff748bab261d69ad5606938f10a3a0c9b7eb66398bb773e3df983ff6197"
+        }
+      }
+    },
+    "1b1d6ac5-872f-4be4-9222-93e7cd42a6ba": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792406852984,
+      "endedAt": 1792406852988,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\e2\\e2579ff748bab261d69ad5606938f10a3a0c9b7eb66398bb773e3df983ff6197",
+          "after": "C:\\Users\\pabal\\.cache\\hyperframes\\history\\0f738850-c96e-4d3c-83ba-baebabc48a8c\\blobs\\71\\716095cb3d1967a2eeef685076a4fd340559d93687f13f436087ec2966a76928"
+        }
+      }
+    }
+  },
+  "checks": {
+    "latest": {
+      "revision": "1b1d6ac5-872f-4be4-9222-93e7cd42a6ba",
+      "id": "f250daa0-8f31-4e79-a840-5c41556441dd"
+    },
+    "revisions": {
+      "117a9902-d7f4-4647-b22f-73dfd32b5686": [
+        {
+          "id": "5eaa1579-ef85-46f2-82b4-83d667dc5013",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 3000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1792406766981,
+          "contentHash": "83d13e307eb749626209c30e928d550caaa36a92eab99760ae4d6da7d7ada824",
+          "revision": "117a9902-d7f4-4647-b22f-73dfd32b5686",
+          "inputFingerprint": "2b3c3d3f90238d3fc52257b5f924a5dbd967df985c5d152bd0ee7ee3e090a3ad",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "e638f26e-be50-45ac-8a92-edc9d73f203d"
+        }
+      ],
+      "1b1d6ac5-872f-4be4-9222-93e7cd42a6ba": [
+        {
+          "id": "f250daa0-8f31-4e79-a840-5c41556441dd",
+          "scope": "project",
+          "report": "D:\\Downloads\\Abstract Algebra\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\f250daa0-8f31-4e79-a840-5c41556441dd.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 3000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1792406880186,
+          "contentHash": "1efb8b10fcbae86414c47b2f6f8750212985b8c8de580973f2c17c45988ebdea",
+          "revision": "1b1d6ac5-872f-4be4-9222-93e7cd42a6ba",
+          "inputFingerprint": "c52c61731be3b6859ee3cca69135887fb041ba21264363cee387644b4d6b4b3c",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
+      ]
+    },
+    "unversioned": [
+      {
+        "id": "301fa9e5-e231-4201-a16a-7e49b54618d6",
+        "scope": "project",
+        "report": "D:\\Downloads\\Abstract Algebra\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\301fa9e5-e231-4201-a16a-7e49b54618d6.json",
+        "metadata": {
+          "ok": false,
+          "browserSkipped": true,
+          "options": {
+            "samples": 9,
+            "atTransitions": false,
+            "maxIssues": 80,
+            "collapseStatic": true,
+            "tolerance": 2,
+            "timeout": 3000,
+            "contrast": true,
+            "strict": false,
+            "snapshots": false,
+            "browserGpuMode": "auto"
+          }
+        },
+        "createdAt": 1792406655980,
+        "contentHash": "a40517582ee2de9618dc571a98f43cd5013e5d9dba26e6f64c1a2c65697faf66",
+        "revision": null,
+        "inputFingerprint": "0d7d2c2621db78def1957a0ef60dd9766ad4fcc5c30042a38577a214663f1cb0",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      }
+    ]
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "e638f26e-be50-45ac-8a92-edc9d73f203d",
+      "completedAt": 1792407165192,
+      "output": "D:\\Downloads\\Abstract Algebra\\brag-output\\brag.mp4",
+      "status": "completed",
+      "revision": "1b1d6ac5-872f-4be4-9222-93e7cd42a6ba"
+    },
+    "retainedRevisions": [
+      "1b1d6ac5-872f-4be4-9222-93e7cd42a6ba"
+    ]
+  },
+  "pendingArtifactCleanup": []
+}

@@ -1,0 +1,6 @@
+What happens when you decode classical cryptography through pure abstract algebra?
+
+Presenting Abstract Algebra Lab — an interactive undergraduate mathematics research project exploring modular arithmetic, affine groups, and symmetric permutations, where every click is a calculation and every inverse has a reason.
+
+https://algebra.lab
+

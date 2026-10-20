@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Abstract Algebra Lab — Launch Film</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: 'Cambria Math';
+        src: local('Cambria Math');
+      }
+
+      *, *::before, *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #fbfbf9;
+        color: #0f172a;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #fbfbf9;
+      }
+
+      /* Global Mathematical Grid Canvas */
+      .math-grid-bg {
+        position: absolute;
+        inset: 0;
+        background-size: 48px 48px;
+        background-image: 
+          linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
+        pointer-events: none;
+      }
+      .math-grid-axes {
+        position: absolute;
+        inset: 0;
+        background-image: 
+          radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.04) 0%, transparent 65%);
+        pointer-events: none;
+      }
+
+      /* Top Academic Header bar across video */
+      .global-hud {
+        position: absolute;
+        top: 36px;
+        left: 64px;
+        right: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: #475569;
+        z-index: 50;
+      }
+      .hud-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .hud-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #2563eb;
+      }
+      .hud-right {
+        display: flex;
+        gap: 24px;
+        font-family: "SF Mono", Monaco, Consolas, monospace;
+        font-size: 12px;
+        color: #475569;
+      }
+
+      /* Common Clip Styling */
+      .clip {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      .scene-inner {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 90px 80px 60px;
+      }
+
+      /* Typography */
+      .eyebrow-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 16px;
+        background: rgba(37, 99, 235, 0.08);
+        border: 1px solid rgba(37, 99, 235, 0.2);
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #1d4ed8;
+        margin-bottom: 24px;
+      }
+      .hero-title {
+        font-size: 68px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 1.05;
+        text-align: center;
+        color: #0f172a;
+        max-width: 1300px;
+      }
+      .hero-subtitle {
+        font-size: 26px;
+        font-weight: 400;
+        line-height: 1.45;
+        color: #475569;
+        text-align: center;
+        max-width: 980px;
+        margin-top: 20px;
+      }
+      .math-serif {
+        font-family: 'Cambria Math', 'Times New Roman', Times, serif;
+        font-style: italic;
+      }
+
+      /* Scene 1: The Mathematical World */
+      .s1-axiom-strip {
+        display: flex;
+        gap: 20px;
+        margin-top: 48px;
+      }
+      .axiom-card {
+        background: #ffffff;
+        border: 1px solid #e2e0d8;
+        border-radius: 14px;
+        padding: 20px 28px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        min-width: 200px;
+      }
+      .axiom-symbol {
+        font-family: 'Cambria Math', 'Times New Roman', Times, serif;
+        font-size: 32px;
+        font-weight: 600;
+        color: #6d28d9;
+      }
+      .axiom-label {
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #1e293b;
+      }
+      .axiom-formula {
+        font-size: 14px;
+        color: #475569;
+        font-family: "SF Mono", Consolas, monospace;
+      }
+
+      /* Scene 2: Caesar & Cyclic Group */
+      .cipher-split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 60px;
+        width: 100%;
+        max-width: 1540px;
+        align-items: center;
+      }
+      .cipher-visual-card {
+        background: #ffffff;
+        border: 1px solid #e2e0d8;
+        border-radius: 20px;
+        padding: 40px;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.04);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        min-height: 480px;
+      }
+      .wheel-svg-wrap {
+        width: 380px;
+        height: 380px;
+        position: relative;
+      }
+      .wheel-svg {
+        width: 100%;
+        height: 100%;
+      }
+      .cipher-info-col {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .math-display-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 24px 30px;
+        width: 100%;
+        margin-top: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+      }
+      .formula-hero {
+        font-family: 'Cambria Math', 'Times New Roman', serif;
+        font-size: 38px;
+        color: #0f172a;
+        margin-bottom: 12px;
+      }
+      .formula-desc {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #475569;
+      }
+      .prop-badges {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .prop-badge {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      /* Scene 3: Affine Group */
+      .affine-calc-flow {
+        display: flex;
+        gap: 24px;
+        width: 100%;
+        max-width: 1540px;
+        margin-top: 28px;
+      }
+      .calc-step-card {
+        flex: 1;
+        background: #ffffff;
+        border: 1px solid #e2e0d8;
+        border-radius: 18px;
+        padding: 30px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.03);
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .step-tag {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #6d28d9;
+        background: #f5f3ff;
+        padding: 4px 12px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+      }
+      .calc-main-num {
+        font-family: 'Cambria Math', 'Times New Roman', serif;
+        font-size: 34px;
+        color: #0f172a;
+        margin-bottom: 10px;
+      }
+      .calc-sub {
+        font-size: 15px;
+        color: #475569;
+        line-height: 1.55;
+      }
+
+      /* Scene 4: Permutations & S4 */
+      .s4-braid-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 1440px;
+      }
+      .braid-visual {
+        display: flex;
+        align-items: center;
+        gap: 40px;
+        margin: 36px 0;
+      }
+      .braid-node-col {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .braid-node {
+        width: 64px;
+        height: 64px;
+        background: #ffffff;
+        border: 2px solid #2563eb;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 700;
+        color: #1e3a8a;
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.12);
+      }
+      .braid-svg {
+        width: 240px;
+        height: 304px;
+      }
+      .braid-res-box {
+        background: #ffffff;
+        border: 1px solid #e2e0d8;
+        border-radius: 16px;
+        padding: 24px 36px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
+      }
+      .res-tag {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1e293b;
+      }
+      .res-letters {
+        font-family: "SF Mono", Consolas, monospace;
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: 0.25em;
+        color: #1d4ed8;
+      }
+
+      /* Scene 5: Project Reveal & Workstation Frame */
+      .browser-mockup {
+        width: 100%;
+        max-width: 1560px;
+        background: #ffffff;
+        border: 1px solid #d4d4d8;
+        border-radius: 18px;
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .browser-header {
+        background: #f4f4f5;
+        border-bottom: 1px solid #e4e4e7;
+        padding: 14px 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .browser-dots {
+        display: flex;
+        gap: 8px;
+      }
+      .browser-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .dot-red { background: #ef4444; }
+      .dot-yellow { background: #f59e0b; }
+      .dot-green { background: #10b981; }
+      .browser-bar {
+        flex: 1;
+        max-width: 520px;
+        background: #ffffff;
+        border: 1px solid #e4e4e7;
+        border-radius: 8px;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-family: "SF Mono", Consolas, monospace;
+        color: #475569;
+      }
+      .browser-content {
+        padding: 44px 50px 48px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .lab-nav-pill-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 30px;
+      }
+      .lab-nav-pill {
+        padding: 8px 20px;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #475569;
+        background: #f4f4f5;
+      }
+      .lab-nav-pill.active {
+        background: #1e293b;
+        color: #ffffff;
+      }
+      .lab-hero-title {
+        font-size: 56px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        text-align: center;
+        color: #0f172a;
+        line-height: 1.1;
+      }
+      .lab-hero-sub {
+        font-size: 22px;
+        color: #6d28d9;
+        font-family: 'Cambria Math', 'Times New Roman', serif;
+        font-style: italic;
+        margin-top: 10px;
+        margin-bottom: 32px;
+      }
+      .lab-preview-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        width: 100%;
+      }
+      .lab-feature-card {
+        background: #fafaf9;
+        border: 1px solid #e7e5e4;
+        border-radius: 14px;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .feat-label {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #2563eb;
+      }
+      .feat-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1e293b;
+      }
+      .feat-desc {
+        font-size: 14px;
+        color: #475569;
+        line-height: 1.45;
+      }
+
+      /* Scene 6: Research Team Credits */
+      .team-scene-wrap {
+        width: 100%;
+        max-width: 1680px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .team-grid-5 {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 22px;
+        width: 100%;
+        margin-top: 36px;
+        margin-bottom: 32px;
+      }
+      .team-card {
+        background: #ffffff;
+        border: 1px solid #e2e0d8;
+        border-radius: 18px;
+        padding: 24px 18px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.04);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .team-avatar-frame {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 3px solid #2563eb;
+        margin-bottom: 18px;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.15);
+        background: #e2e8f0;
+      }
+      .team-avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .team-card-name {
+        font-size: 18px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.25;
+        margin-bottom: 6px;
+      }
+      .team-card-reg {
+        font-family: "SF Mono", Consolas, monospace;
+        font-size: 13px;
+        font-weight: 700;
+        color: #1d4ed8;
+        background: #eff6ff;
+        padding: 3px 10px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      }
+      .team-card-role {
+        font-size: 13px;
+        color: #475569;
+        font-weight: 500;
+        line-height: 1.4;
+      }
+      .final-credo-bar {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-top: 10px;
+      }
+      .final-credo-text {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        color: #0f172a;
+        text-transform: uppercase;
+      }
+      .credo-dot {
+        color: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="26"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- Audio Elements: Background Music + SFX with IDs and accurate duration -->
+      <audio id="bgm" src="assets/music/bed.mp3" data-start="0" data-duration="26" data-volume="0.55"></audio>
+      <audio id="sfx-tick" src="assets/sfx/switch3.ogg" data-start="1.5" data-duration="0.37" data-volume="0.3"></audio>
+      <audio id="sfx-wheel" src="assets/sfx/rollover1.ogg" data-start="4.5" data-duration="0.23" data-volume="0.35"></audio>
+      <audio id="sfx-click1" src="assets/sfx/click1.ogg" data-start="9.0" data-duration="0.10" data-volume="0.35"></audio>
+      <audio id="sfx-snap" src="assets/sfx/switch11.ogg" data-start="13.2" data-duration="0.30" data-volume="0.35"></audio>
+      <audio id="sfx-reveal" src="assets/sfx/switch3.ogg" data-start="17.0" data-duration="0.37" data-volume="0.4"></audio>
+
+      <!-- Background Ambient Grid -->
+      <div class="math-grid-bg"></div>
+      <div class="math-grid-axes"></div>
+
+      <!-- Persistent Academic HUD -->
+      <header class="global-hud">
+        <div class="hud-left">
+          <span class="hud-dot"></span>
+          <span>Abstract Algebra Laboratory &bull; Undergraduate Research</span>
+        </div>
+        <div class="hud-right">
+          <span>&lang;G, &lowast;&rang; ALGEBRAIC CRYPTOGRAPHY</span>
+          <span>SYS.VERIFIED &check;</span>
+        </div>
+      </header>
+
+      <!-- SCENE 1: The Mathematical World (0.0s – 4.0s) -->
+      <section id="scene-1" class="clip" data-start="0" data-duration="4.2" data-track-index="1">
+        <div class="scene-inner" id="s1-inner">
+          <div class="eyebrow-pill" id="s1-pill">Mathematical Foundation &bull; Group Theory</div>
+          <h1 class="hero-title" id="s1-title">Algebraic Foundations of Ciphers</h1>
+          <p class="hero-subtitle" id="s1-sub">
+            Every reversible transformation is an element of an algebraic group. Encryption is group action; decryption is its exact algebraic inverse.
+          </p>
+          <div class="s1-axiom-strip" id="s1-axioms">
+            <div class="axiom-card">
+              <span class="axiom-symbol">&forall; a,b &in; G</span>
+              <span class="axiom-label">Closure</span>
+              <span class="axiom-formula">a &lowast; b &in; G</span>
+            </div>
+            <div class="axiom-card">
+              <span class="axiom-symbol">(a &lowast; b) &lowast; c</span>
+              <span class="axiom-label">Associativity</span>
+              <span class="axiom-formula">a &lowast; (b &lowast; c)</span>
+            </div>
+            <div class="axiom-card">
+              <span class="axiom-symbol">&exist; e &in; G</span>
+              <span class="axiom-label">Identity Element</span>
+              <span class="axiom-formula">a &lowast; e = a</span>
+            </div>
+            <div class="axiom-card">
+              <span class="axiom-symbol">&exist; g<sup>&minus;1</sup></span>
+              <span class="axiom-label">Inverse Element</span>
+              <span class="axiom-formula">g &lowast; g<sup>&minus;1</sup> = e</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 2: Caesar Cipher & Cyclic Group (4.0s – 8.0s) -->
+      <section id="scene-2" class="clip" data-start="4.0" data-duration="4.2" data-track-index="1">
+        <div class="scene-inner" id="s2-inner">
+          <div class="cipher-split">
+            <div class="cipher-visual-card" id="s2-visual">
+              <div class="eyebrow-pill" style="margin-bottom: 14px;">Cyclic Transformation &bull; C₂₆</div>
+              <div class="wheel-svg-wrap">
+                <svg class="wheel-svg" viewBox="0 0 400 400">
+                  <!-- Outer Guide Circle -->
+                  <circle cx="200" cy="200" r="170" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-dasharray="4 4" />
+                  <!-- Outer Plaintext Track -->
+                  <circle cx="200" cy="200" r="145" fill="none" stroke="#2563eb" stroke-width="28" stroke-opacity="0.1" />
+                  <!-- Inner Ciphertext Track -->
+                  <circle cx="200" cy="200" r="105" fill="none" stroke="#7c3aed" stroke-width="26" stroke-opacity="0.15" />
+                  <!-- Center Core -->
+                  <circle cx="200" cy="200" r="54" fill="#ffffff" stroke="#e2e0d8" stroke-width="2" />
+                  <text x="200" y="195" text-anchor="middle" font-size="12" font-weight="700" fill="#475569" letter-spacing="1">SHIFT</text>
+                  <text x="200" y="218" text-anchor="middle" font-size="22" font-weight="800" fill="#2563eb">+3</text>
+                  <!-- Rotating Wheel Group -->
+                  <g id="s2-wheel-rot" data-layout-allow-overflow="true" transform="rotate(0, 200, 200)">
+                    <!-- Outer letters markers with high contrast badges -->
+                    <circle cx="200" cy="55" r="14" fill="#1e3a8a" />
+                    <text x="200" y="60" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">A</text>
+                    <text x="200" y="32" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">x = 0</text>
+                    
+                    <circle cx="345" cy="200" r="14" fill="#1e293b" />
+                    <text x="345" y="205" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">G</text>
+
+                    <circle cx="200" cy="345" r="14" fill="#1e293b" />
+                    <text x="200" y="350" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">N</text>
+
+                    <circle cx="55" cy="200" r="14" fill="#1e293b" />
+                    <text x="55" y="205" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">U</text>
+
+                    <!-- Inner shifted letter marker -->
+                    <circle cx="200" cy="95" r="14" fill="#6d28d9" />
+                    <text x="200" y="100" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">D</text>
+                    <text x="200" y="122" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">y = 3</text>
+                  </g>
+                  <!-- Static Alignment Arrow -->
+                  <line x1="200" y1="72" x2="200" y2="78" stroke="#0f172a" stroke-width="3" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="cipher-info-col" id="s2-info">
+              <div class="eyebrow-pill">Caesar Cipher &bull; Additive Cyclic Group</div>
+              <h2 style="font-size: 46px; font-weight: 800; color: #0f172a; line-height: 1.15;">
+                Modular Shift on <span class="math-serif">&Zopf;₂₆</span>
+              </h2>
+              <div class="math-display-card">
+                <div class="formula-hero">
+                  E<sub>k</sub>(x) = (x + k) mod 26
+                </div>
+                <div class="formula-hero" style="font-size: 30px; color: #7c3aed; margin-top: 10px;">
+                  D<sub>k</sub>(y) = (y &minus; k) mod 26
+                </div>
+                <p class="formula-desc" style="margin-top: 14px;">
+                  Isomorphic to the cyclic group <span class="math-serif">C₂₆</span> under addition modulo 26. Generated by <span class="math-serif">&lang;1&rang;</span> with group order <span class="math-serif">|C₂₆| = 26</span>.
+                </p>
+              </div>
+              <div class="prop-badges">
+                <span class="prop-badge">Identity: k = 0</span>
+                <span class="prop-badge">Inverse: &minus;k mod 26</span>
+                <span class="prop-badge">Abelian Group</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 3: Affine Cipher & Affine Group (8.0s – 12.0s) -->
+      <section id="scene-3" class="clip" data-start="8.0" data-duration="4.2" data-track-index="1">
+        <div class="scene-inner" id="s3-inner">
+          <div class="eyebrow-pill" id="s3-pill">Affine Cipher &bull; Linear Invertibility</div>
+          <h2 class="hero-title" style="font-size: 52px;" id="s3-title">
+            The Affine Group <span class="math-serif">Aff(&Zopf;₂₆)</span>
+          </h2>
+          <p class="hero-subtitle" style="margin-top: 12px; margin-bottom: 12px;" id="s3-sub">
+            Combining modular scaling and translation: <span class="math-serif">E<sub>(a, b)</sub>(x) = (ax + b) mod 26</span>
+          </p>
+          <div class="affine-calc-flow" id="s3-cards">
+            <div class="calc-step-card">
+              <span class="step-tag">Step 1 &bull; Coprimality Condition</span>
+              <div class="calc-main-num">gcd(a, 26) = 1</div>
+              <p class="calc-sub">
+                Multiplier <span class="math-serif">a</span> must be a unit in the ring <span class="math-serif">&Zopf;₂₆<sup>&times;</sup></span>. There exist exactly 12 invertible multipliers: {1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25}.
+              </p>
+            </div>
+            <div class="calc-step-card" style="border-color: #c4b5fd;">
+              <span class="step-tag" style="background: #ede9fe; color: #5b21b6;">Step 2 &bull; Modular Multiplicative Inverse</span>
+              <div class="calc-main-num" style="color: #6d28d9;">a = 5 &rArr; a<sup>&minus;1</sup> = 21</div>
+              <p class="calc-sub">
+                Verified: <span class="math-serif">(5 &times; 21) mod 26 = 105 mod 26 = 1</span>.<br />Decryption scalar exists uniquely, ensuring guaranteed decipherability.
+              </p>
+            </div>
+            <div class="calc-step-card">
+              <span class="step-tag">Step 3 &bull; Inverse Transformation</span>
+              <div class="calc-main-num" style="font-size: 28px;">D(y) = a<sup>&minus;1</sup>(y &minus; b) mod 26</div>
+              <p class="calc-sub">
+                For key <span class="math-serif">(5, 8)</span>, inverse key is <span class="math-serif">(21, 14)</span>.<br />The transformation forms a closed algebraic group of order 312.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 4: Permutations & S4 (12.0s – 16.0s) -->
+      <section id="scene-4" class="clip" data-start="12.0" data-duration="4.2" data-track-index="1">
+        <div class="scene-inner" id="s4-inner">
+          <div class="eyebrow-pill" id="s4-pill">Position Permutations &bull; Non-Abelian Symmetry</div>
+          <h2 class="hero-title" style="font-size: 52px;" id="s4-title">
+            The Symmetric Group <span class="math-serif">S₄</span>
+          </h2>
+          <div class="s4-braid-panel">
+            <div class="braid-visual" id="s4-visual">
+              <div class="braid-node-col">
+                <div class="braid-node">1</div>
+                <div class="braid-node">2</div>
+                <div class="braid-node">3</div>
+                <div class="braid-node">4</div>
+              </div>
+              <!-- Braiding SVG paths -->
+              <svg class="braid-svg" viewBox="0 0 240 304">
+                <!-- Node 1 -> Position 3 (y: 32 -> 184) -->
+                <path d="M 0 32 C 120 32, 120 184, 240 184" fill="none" stroke="#2563eb" stroke-width="4" />
+                <!-- Node 2 -> Position 1 (y: 108 -> 32) -->
+                <path d="M 0 108 C 120 108, 120 32, 240 32" fill="none" stroke="#7c3aed" stroke-width="4" />
+                <!-- Node 3 -> Position 4 (y: 184 -> 260) -->
+                <path d="M 0 184 C 120 184, 120 260, 240 260" fill="none" stroke="#0284c7" stroke-width="4" />
+                <!-- Node 4 -> Position 2 (y: 260 -> 108) -->
+                <path d="M 0 260 C 120 260, 120 108, 240 108" fill="none" stroke="#d97706" stroke-width="4" />
+              </svg>
+              <div class="braid-node-col">
+                <div class="braid-node" style="border-color: #7c3aed; color: #5b21b6;">3</div>
+                <div class="braid-node" style="border-color: #d97706; color: #92400e;">1</div>
+                <div class="braid-node" style="border-color: #2563eb; color: #1e3a8a;">4</div>
+                <div class="braid-node" style="border-color: #0284c7; color: #075985;">2</div>
+              </div>
+            </div>
+
+            <div class="braid-res-box" id="s4-res">
+              <span class="res-tag">Permutation &sigma; = [3, 1, 4, 2]</span>
+              <span style="color: #94a3b8; font-size: 20px;">&bull;</span>
+              <span class="res-tag">Inverse &sigma;<sup>&minus;1</sup> = [2, 4, 1, 3]</span>
+              <span style="color: #94a3b8; font-size: 20px;">&bull;</span>
+              <span class="res-letters" id="s4-letters">CADB &rarr; ABCD</span>
+            </div>
+            <p style="font-size: 15px; color: #475569; margin-top: 18px; text-align: center; max-width: 900px;" id="s4-note">
+              Demonstrates position rearrangement, permutation composition, and group structure <span class="math-serif">|S₄| = 4! = 24</span>. (Studied as algebraic structure, not standard standalone encryption.)
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 5: Project Reveal (16.0s – 21.0s) -->
+      <section id="scene-5" class="clip" data-start="16.0" data-duration="5.2" data-track-index="1">
+        <div class="scene-inner" id="s5-inner">
+          <div class="browser-mockup" id="s5-browser">
+            <div class="browser-header">
+              <div class="browser-dots">
+                <span class="browser-dot dot-red"></span>
+                <span class="browser-dot dot-yellow"></span>
+                <span class="browser-dot dot-green"></span>
+              </div>
+              <div class="browser-bar">https://algebra.lab/interactive/three-systems</div>
+            </div>
+            <div class="browser-content">
+              <div class="lab-nav-pill-row">
+                <span class="lab-nav-pill">Theory</span>
+                <span class="lab-nav-pill active">The Lab</span>
+                <span class="lab-nav-pill">Experiments</span>
+                <span class="lab-nav-pill">Research</span>
+                <span class="lab-nav-pill">Team</span>
+              </div>
+              <h1 class="lab-hero-title">
+                ABSTRACT ALGEBRA LAB
+              </h1>
+              <p class="lab-hero-sub">
+                Cryptography Through Abstract Algebra: An Interactive Study of Three Transformation Systems
+              </p>
+              <div class="lab-preview-grid">
+                <div class="lab-feature-card">
+                  <span class="feat-label">Cyclic System</span>
+                  <span class="feat-title">Caesar Group C₂₆</span>
+                  <span class="feat-desc">Interactive dual concentric wheel with live modular shift and generator analysis.</span>
+                </div>
+                <div class="lab-feature-card" style="border-color: #c4b5fd;">
+                  <span class="feat-label" style="color: #6d28d9;">Linear System</span>
+                  <span class="feat-title">Affine Group G<sub>aff</sub></span>
+                  <span class="feat-desc">Units of &Zopf;₂₆, Euclidean modular inversion, and function composition.</span>
+                </div>
+                <div class="lab-feature-card">
+                  <span class="feat-label">Permutation System</span>
+                  <span class="feat-title">Symmetric Group S₄</span>
+                  <span class="feat-desc">24 position permutations with composition multiplication tables and cycle decomposition.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 6: Research Team & Credo (21.0s – 26.0s) -->
+      <section id="scene-6" class="clip" data-start="21.0" data-duration="5.0" data-track-index="1">
+        <div class="scene-inner" id="s6-inner">
+          <div class="team-scene-wrap">
+            <div class="eyebrow-pill" id="s6-pill" style="margin-bottom: 12px;">Undergraduate Mathematics Research</div>
+            <h2 class="hero-title" style="font-size: 46px; letter-spacing: -0.02em;" id="s6-title">
+              RESEARCH TEAM
+            </h2>
+
+            <div class="team-grid-5" id="s6-team">
+              <!-- Member 1: P.V.S. Subramanya Prasad -->
+              <div class="team-card">
+                <div class="team-avatar-frame">
+                  <img class="team-avatar-img" src="assets/team/pvssp.jpg" alt="P.V.S. Subramanya Prasad" />
+                </div>
+                <span class="team-card-name">P.V.S. Subramanya Prasad</span>
+                <span class="team-card-reg">24MMI0011</span>
+                <span class="team-card-role">Project Lead &amp; Technical Lead</span>
+              </div>
+
+              <!-- Member 2: Ananya Anand -->
+              <div class="team-card">
+                <div class="team-avatar-frame">
+                  <img class="team-avatar-img" src="assets/team/ananya.jpg" alt="Ananya Anand" />
+                </div>
+                <span class="team-card-name">Ananya Anand</span>
+                <span class="team-card-reg">24MMI0010</span>
+                <span class="team-card-role">Presentation &amp; Explanation</span>
+              </div>
+
+              <!-- Member 3: Aditya Datta -->
+              <div class="team-card">
+                <div class="team-avatar-frame">
+                  <img class="team-avatar-img" src="assets/team/dotto05.jpg" alt="Aditya Datta" />
+                </div>
+                <span class="team-card-name">Aditya Datta</span>
+                <span class="team-card-reg">24MMI0013</span>
+                <span class="team-card-role">Usability &amp; QA Support</span>
+              </div>
+
+              <!-- Member 4: Varun Raaj -->
+              <div class="team-card">
+                <div class="team-avatar-frame">
+                  <img class="team-avatar-img" src="assets/team/varun.jpg" alt="Varun Raaj" />
+                </div>
+                <span class="team-card-name">Varun Raaj</span>
+                <span class="team-card-reg">24MMI0009</span>
+                <span class="team-card-role">Mathematical Verification &amp; QA</span>
+              </div>
+
+              <!-- Member 5: Pavani Durga C -->
+              <div class="team-card">
+                <div class="team-avatar-frame">
+                  <img class="team-avatar-img" src="assets/team/pavani.jpg" alt="Pavani Durga C" />
+                </div>
+                <span class="team-card-name">Pavani Durga C</span>
+                <span class="team-card-reg">24MMI0020</span>
+                <span class="team-card-role">Literature Review &amp; Academic Research</span>
+              </div>
+            </div>
+
+            <div class="final-credo-bar" id="s6-credo">
+              <span class="final-credo-text">MATHEMATICS <span class="credo-dot">&bull;</span> STRUCTURE <span class="credo-dot">&bull;</span> INTERACTION</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- GSAP Seekable Timeline Script -->
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      // ================= SCENE 1 (0.0s – 4.0s) =================
+      tl.fromTo("#s1-pill", { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 0.2);
+      tl.fromTo("#s1-title", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.4);
+      tl.fromTo("#s1-sub", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.7, ease: "power2.out" }, 0.6);
+      tl.fromTo(".axiom-card", { opacity: 0, y: 20, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, stagger: 0.12, duration: 0.6, ease: "back.out(1.2)" }, 0.9);
+      tl.to("#s1-inner", { opacity: 0, scale: 0.98, duration: 0.4, ease: "power2.in" }, 3.6);
+
+      // ================= SCENE 2 (4.0s – 8.0s) =================
+      tl.fromTo("#s2-visual", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.7, ease: "power3.out" }, 4.1);
+      tl.fromTo("#s2-info", { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.7, ease: "power3.out" }, 4.3);
+      // Animate Caesar wheel rotating +3 positions (3/26 * 360 = 41.54 deg)
+      tl.fromTo("#s2-wheel-rot", { rotation: 0 }, { rotation: 41.54, duration: 1.4, ease: "power2.inOut" }, 4.6);
+      tl.to("#s2-inner", { opacity: 0, x: -20, duration: 0.4, ease: "power2.in" }, 7.6);
+
+      // ================= SCENE 3 (8.0s – 12.0s) =================
+      tl.fromTo("#s3-pill", { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 8.1);
+      tl.fromTo("#s3-title", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 8.3);
+      tl.fromTo("#s3-sub", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 8.5);
+      tl.fromTo(".calc-step-card", { opacity: 0, y: 24 }, { opacity: 1, y: 0, stagger: 0.16, duration: 0.65, ease: "power3.out" }, 8.8);
+      tl.to("#s3-inner", { opacity: 0, y: -16, duration: 0.4, ease: "power2.in" }, 11.6);
+
+      // ================= SCENE 4 (12.0s – 16.0s) =================
+      tl.fromTo("#s4-pill", { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 12.1);
+      tl.fromTo("#s4-title", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 12.3);
+      tl.fromTo("#s4-visual", { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, duration: 0.7, ease: "back.out(1.2)" }, 12.6);
+      tl.fromTo("#s4-res", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 13.1);
+      tl.fromTo("#s4-note", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 13.5);
+      tl.to("#s4-inner", { opacity: 0, scale: 0.97, duration: 0.4, ease: "power2.in" }, 15.6);
+
+      // ================= SCENE 5 (16.0s – 21.0s) =================
+      tl.fromTo("#s5-browser", { opacity: 0, y: 36, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "power3.out" }, 16.2);
+      tl.fromTo(".lab-feature-card", { opacity: 0, y: 16 }, { opacity: 1, y: 0, stagger: 0.12, duration: 0.6, ease: "power2.out" }, 17.0);
+      tl.to("#s5-inner", { opacity: 0, scale: 1.02, duration: 0.45, ease: "power2.in" }, 20.6);
+
+      // ================= SCENE 6 (21.0s – 26.0s) =================
+      tl.fromTo("#s6-pill", { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 21.1);
+      tl.fromTo("#s6-title", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 21.3);
+      tl.fromTo(".team-card", { opacity: 0, y: 24, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, stagger: 0.1, duration: 0.65, ease: "back.out(1.2)" }, 21.6);
+      tl.fromTo("#s6-credo", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.7, ease: "power3.out" }, 23.4);
+
+      // Register timeline
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
+
