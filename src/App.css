@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --ink: #0b0c11;
   --surface: rgba(15, 16, 24, 0.82);
   --surface-solid: #151620;
@@ -1433,7 +1433,7 @@ h3 {
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(176, 163, 255, 0.08);
 }
 
-/* Summary row — using a semantic <button> reset */
+/* Summary row â€” using a semantic <button> reset */
 .team-row-summary {
   display: flex;
   justify-content: space-between;
@@ -1485,7 +1485,7 @@ h3 {
   display: block;
 }
 
-/* Initials fallback — small (summary row) */
+/* Initials fallback â€” small (summary row) */
 .team-initials-fallback {
   font: 18px/1 var(--mono);
   color: var(--lav);
@@ -1559,7 +1559,7 @@ h3 {
   font-weight: 600;
 }
 
-/* Expanded profile — two-column layout */
+/* Expanded profile â€” two-column layout */
 .team-expanded-profile {
   border-top: 1px solid var(--line);
   overflow: hidden;
@@ -1597,7 +1597,7 @@ h3 {
   display: block;
 }
 
-/* Initials fallback — large (expanded profile) */
+/* Initials fallback â€” large (expanded profile) */
 .team-profile-initials-fallback {
   font: 48px/1 var(--serif);
   color: var(--lav);
@@ -1645,6 +1645,7 @@ h3 {
   display: block;
   margin-bottom: 12px;
 }
+
 .responsibilities-list {
   margin: 0;
   padding: 0;
@@ -1653,19 +1654,22 @@ h3 {
   flex-direction: column;
   gap: 8px;
 }
+
 .responsibilities-list li {
   position: relative;
   padding-left: 20px;
   font-size: 15px;
   line-height: 1.65;
-  color: #cfccd7;
+  color: #cfcdd7;
 }
+
 .responsibilities-list li::before {
-  content: "→";
+  content: "\2192";
   position: absolute;
   left: 0;
   color: var(--lav);
 }
+
 
 /* Team note */
 .team-note {
@@ -1744,7 +1748,7 @@ h3 {
   margin-left: 8px;
 }
 
-/* Team page responsive — tablet */
+/* Team page responsive â€” tablet */
 @media (max-width: 900px) {
   .team-profile-content {
     grid-template-columns: 160px 1fr;
@@ -1762,8 +1766,27 @@ h3 {
     padding: 36px 28px;
   }
 }
-/* Team page responsive — mobile */
+/* Hero headline and Team page responsive â€” mobile */
 @media (max-width: 600px) {
+  .hero-headline {
+    margin-bottom: 20px;
+    line-height: 1.0;
+  }
+  .hero-headline-line {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.0;
+  }
+  .hero-headline-word {
+    font-size: clamp(34px, 11vw, 50px);
+    line-height: 1.0;
+    letter-spacing: -0.03em;
+  }
+  .hero-headline-serif .hero-serif-word {
+    font-size: clamp(33px, 10.5vw, 48px);
+    line-height: 1.0;
+  }
   .team-profile-content {
     grid-template-columns: 1fr;
     gap: 20px;
@@ -1862,7 +1885,7 @@ h3 {
   font: 16px/2.2 var(--mono);
 }
 .research-block li:before {
-  content: "→";
+  content: "â†’";
   color: var(--lav);
   margin-right: 10px;
 }
@@ -2160,7 +2183,7 @@ h3 {
   margin-bottom: 8px;
 }
 .formula-defs li:before {
-  content: "◈";
+  content: "â—ˆ";
   position: absolute;
   left: 0;
   color: var(--lav);
@@ -6158,10 +6181,10 @@ footer {
 
 
 /* ==========================================================================
-   ALGEBRAIC STRUCTURES — MINIMAL REDESIGN STYLES
+   ALGEBRAIC STRUCTURES â€” MINIMAL REDESIGN STYLES
    ========================================================================== */
 
-/* ── Hero override ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Hero override â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .struc-hero {
   margin-bottom: 48px;
 }
@@ -6187,7 +6210,7 @@ footer {
   letter-spacing: 0.015em;
 }
 
-/* ── KaTeX dark theme readability for structure page ───────────────────────── */
+/* â”€â”€ KaTeX dark theme readability for structure page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .structure-page .katex {
   color: #e8e7ee;
 }
@@ -6210,7 +6233,7 @@ footer {
   color: #e8e7ee;
 }
 
-/* ── Sticky nav ────────────────────────────────────────────────────────────── */
+/* â”€â”€ Sticky nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .struc-nav {
   display: flex;
   gap: 4px;
@@ -6249,7 +6272,7 @@ footer {
   font-weight: 600;
 }
 
-/* ── Section scaffold ──────────────────────────────────────────────────────── */
+/* â”€â”€ Section scaffold â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .struc-section {
   margin-bottom: 100px;
   padding-top: 8px;
@@ -6283,7 +6306,7 @@ footer {
   margin: 0 0 32px;
 }
 
-/* ── Tab row ───────────────────────────────────────────────────────────────── */
+/* â”€â”€ Tab row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tab-row {
   display: flex;
   gap: 8px;
@@ -6311,7 +6334,7 @@ footer {
   font-weight: 600;
 }
 
-/* ── Common controls ───────────────────────────────────────────────────────── */
+/* â”€â”€ Common controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ctrl-row {
   display: flex;
   align-items: center;
@@ -6368,7 +6391,7 @@ footer {
   color: var(--white);
 }
 
-/* ── Systems Grid (Section B) ──────────────────────────────────────────────── */
+/* â”€â”€ Systems Grid (Section B) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .systems-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -6553,7 +6576,7 @@ footer {
   line-height: 1.5;
 }
 
-/* ── Reversibility Section ─────────────────────────────────────────────────── */
+/* â”€â”€ Reversibility Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .rev-controls {
   display: flex;
   flex-direction: column;
@@ -6713,7 +6736,7 @@ footer {
   margin-top: 8px;
 }
 
-/* ── Group Axioms Section ──────────────────────────────────────────────────── */
+/* â”€â”€ Group Axioms Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .axioms-list {
   display: flex;
   flex-direction: column;
@@ -6833,7 +6856,7 @@ footer {
 .assoc-route code { color: var(--white); }
 .assoc-eq { color: #8df0a9; font-weight: 700; }
 
-/* ── Composition Section ───────────────────────────────────────────────────── */
+/* â”€â”€ Composition Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .comp-controls {
   background: rgba(10, 11, 16, 0.6);
   border: 1px solid var(--line);
@@ -6940,7 +6963,7 @@ footer {
 }
 .comp-math-detail .katex-display { margin: 0; }
 
-/* ── Commutativity Section ─────────────────────────────────────────────────── */
+/* â”€â”€ Commutativity Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .comm-display {
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -7009,7 +7032,7 @@ footer {
   border-top: 1px solid var(--line);
 }
 
-/* ── Takeaway / Summary Section ────────────────────────────────────────────── */
+/* â”€â”€ Takeaway / Summary Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .takeaway-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -7042,7 +7065,7 @@ footer {
   position: relative;
 }
 .takeaway-list li::before {
-  content: "✓";
+  content: "âœ“";
   position: absolute;
   left: 0;
   color: #8df0a9;
@@ -7050,7 +7073,7 @@ footer {
   font-size: 11px;
 }
 .takeaway-list.not-list li::before {
-  content: "✕";
+  content: "âœ•";
   color: #f0a38d;
 }
 .takeaway-list li strong {
@@ -7107,7 +7130,7 @@ footer {
   flex-shrink: 0;
 }
 
-/* ── Responsive ────────────────────────────────────────────────────────────── */
+/* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 1080px) {
   .systems-grid {
     grid-template-columns: 1fr;
@@ -7174,7 +7197,7 @@ footer {
 }
 
 /* ==========================================================================
-   Common Algebraic Structure — Foundational Synthesis Section
+   Common Algebraic Structure â€” Foundational Synthesis Section
    ========================================================================== */
 .common-structure-foundation {
   margin-top: 48px;
@@ -8380,7 +8403,7 @@ footer {
 }
 
 /* ==========================================================================
-   Common Algebraic Structure — Intuitive, Properties & Shared vs Differ
+   Common Algebraic Structure â€” Intuitive, Properties & Shared vs Differ
    ========================================================================== */
 .found-intuitive-block {
   background: rgba(176, 163, 255, 0.04);
@@ -8542,7 +8565,7 @@ footer {
   position: relative;
 }
 .shared-list li::before {
-  content: "◈";
+  content: "â—ˆ";
   position: absolute;
   left: 0;
   color: #8df0a9;
@@ -8550,7 +8573,7 @@ footer {
   top: 1px;
 }
 .differ-list li::before {
-  content: "◇";
+  content: "â—‡";
   position: absolute;
   left: 0;
   color: var(--ice);
@@ -8595,7 +8618,7 @@ footer {
 
 
 /* ==========================================================================
-   Section 07 — One Framework, Three Systems  (#sec-unified)
+   Section 07 â€” One Framework, Three Systems  (#sec-unified)
    ========================================================================== */
 
 /* Layout polish for earlier sections */
@@ -8927,3 +8950,130 @@ footer {
 .caesar-box { border-top: 3px solid var(--lav); }
 .affine-box  { border-top: 3px solid var(--ice); }
 .perm-box    { border-top: 3px solid #dcdceb;   }
+
+
+/* Cryptography decoder effect */
+.crypto-decoder {
+  display: inline;
+  font: inherit;
+  letter-spacing: inherit;
+  color: ffffff;
+  white-space: nowrap;
+}
+
+.crypto-decoder__visual::before {
+  content: "CRYPTOGRAPHY";
+  animation: crypto-decoder 4s steps(1, end) infinite;
+}
+
+@keyframes crypto-decoder {
+  0% {
+    content: "▓K#R1&Q!@X9";
+    color: #ffffff;
+  }
+
+  8% {
+    content: "C%Y#O3▒A!X9";
+  }
+
+  16% {
+    content: "CR☰P*OG▒A#Y";
+  }
+
+  24% {
+    content: "CRY7TOGRA#Y";
+  }
+
+  32% {
+    content: "CRYPTOGRAℙHY";
+  }
+
+  40%, 82% {
+    content: "CRYPTOGRAPHY";
+    color: #ffffff;
+  }
+
+  88% {
+    content: "CRY7O*RAPHY";
+    color: #ffffff;
+  }
+
+  94% {
+    content: "▒#YP7O!@H▓Y";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crypto-decoder__visual::before {
+    animation: none;
+    content: "CRYPTOGRAPHY";
+    color: #ffffff;
+  }
+}
+
+
+/* Trace the proof — letter-by-letter fade effect */
+.fx-fade {
+  display: inline-flex;
+  font: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  letter-spacing: inherit;
+  color: #B6A0FF;
+  white-space: pre;
+}
+
+.fx-fade b {
+  display: inline-block;
+  font: inherit;
+  font-weight: inherit;
+  animation: fx-fade 4.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.09s);
+}
+
+@keyframes fx-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(6px);
+  }
+
+  22%, 62% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+
+  84%, 100% {
+    opacity: 0;
+    transform: translateY(-8px);
+    filter: blur(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-fade b {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+
+.lab-page h1 em {
+  display: inline-block;
+  margin-top: 0.08em;
+}
+
+
+.responsibilities-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.responsibility-arrow {
+  flex-shrink: 0;
+  color: #A995FF;
+}

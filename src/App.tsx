@@ -110,9 +110,7 @@ function App() {
             <i />
             <i />
           </span>
-          <span>
-            Abstract <b>Algebra</b> Lab
-          </span>
+          <span className="brand-name">NOETIC</span>
         </button>
         <button
           className="menu-toggle"
@@ -131,14 +129,10 @@ function App() {
               className={page === item.id ? "active" : ""}
               onClick={() => navigate(item.id)}
             >
-              <small>{item.number}</small>
               {item.label}
             </button>
           ))}
         </nav>
-        <span className="status">
-          <i /> live system
-        </span>
       </header>
       <main>
         <AnimatePresence mode="wait">
@@ -233,7 +227,13 @@ function Home({
             A FIELD GUIDE TO REVERSIBLE SYSTEMS <span>◈</span>
           </p>
           <h1>
-            Cryptography
+            <span
+              className="crypto-decoder"
+              role="text"
+              aria-label="Cryptography"
+            >
+              <span className="crypto-decoder__visual" aria-hidden="true" />
+            </span>
             <br />
             <em>through</em> abstract
             <br />
@@ -488,7 +488,24 @@ function Lab(props: {
           <>
             Turn the key.
             <br />
-            <em>Trace the proof.</em>
+            <em>
+              <span
+                className="fx-fade"
+                role="text"
+                aria-label="Trace the proof"
+              >
+                {"Trace the proof".split("").map((char,i) => (
+                  <b
+                    key={i}
+                    aria-hidden="true"
+                    style={{ "--i":i } as React.CSSProperties}
+                  >
+                    {char === " " ? "\u00A0" : char}
+                  </b>
+                ))}
+              </span>
+            </em>
+
           </>
         }
       >
