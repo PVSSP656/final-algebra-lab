@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { Download } from "lucide-react";
 import {
   AFFINE_UNITS,
   ALPHABET,
@@ -1091,6 +1092,14 @@ function Team() {
             className="team-cta-button"
           >
             View Project on GitHub <span>↗</span>
+          </a>
+          <a
+            href="/documents/research-paper.pdf"
+            download="Abstract-Algebra-Lab-Research-Paper.pdf"
+            className="team-cta-button team-download-button"
+          >
+            <Download size={14} strokeWidth={2.5} aria-hidden="true" />
+            Download Research Paper (PDF)
           </a>
         </div>
       </section>

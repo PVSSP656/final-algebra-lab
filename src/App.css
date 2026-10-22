@@ -1748,6 +1748,23 @@ h3 {
   margin-left: 8px;
 }
 
+.team-download-button {
+  background: transparent;
+  color: var(--lav);
+  border: 1px solid var(--lav);
+  margin-left: 12px;
+}
+.team-download-button:hover {
+  background: rgba(167, 139, 250, 0.12);
+  color: #c5bdff;
+  border-color: #c5bdff;
+}
+@media (max-width: 480px) {
+  .team-download-button {
+    margin-left: 0;
+    margin-top: 12px;
+  }
+}
 /* Team page responsive â€” tablet */
 @media (max-width: 900px) {
   .team-profile-content {
