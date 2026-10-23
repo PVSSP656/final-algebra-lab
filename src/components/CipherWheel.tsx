@@ -389,8 +389,8 @@ export function CipherWheel({
           <defs>
             {/* Violet Outer Glow Filter */}
             <filter id="violetGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="3.5" result="blur" />
-              <feFlood floodColor="#b0a3ff" floodOpacity="0.85" result="color" />
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feFlood floodColor="#7C3AED" floodOpacity="0.5" result="color" />
               <feComposite in="color" in2="blur" operator="in" result="glow" />
               <feMerge>
                 <feMergeNode in="glow" />
@@ -400,8 +400,8 @@ export function CipherWheel({
 
             {/* Cyan Inner Glow Filter */}
             <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="3.5" result="blur" />
-              <feFlood floodColor="#00e5ff" floodOpacity="0.85" result="color" />
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feFlood floodColor="#6366F1" floodOpacity="0.5" result="color" />
               <feComposite in="color" in2="blur" operator="in" result="glow" />
               <feMerge>
                 <feMergeNode in="glow" />
@@ -409,18 +409,18 @@ export function CipherWheel({
               </feMerge>
             </filter>
 
-            {/* Subtle Core Background Gradient */}
-            <radialGradient id="coreBg" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#1a1829" stopOpacity="0.95" />
-              <stop offset="60%" stopColor="#0f1019" stopOpacity="0.98" />
-              <stop offset="100%" stopColor="#08090d" stopOpacity="1" />
+            {/* Neumorphic Convex Core Dial Gradient */}
+            <radialGradient id="coreBg" cx="42%" cy="38%" r="62%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
+              <stop offset="55%" stopColor="#E4E8EE" stopOpacity="1" />
+              <stop offset="100%" stopColor="#CCD5E0" stopOpacity="1" />
             </radialGradient>
 
             {/* Linear Gradient for Cardinal Lines */}
             <linearGradient id="radialGuideGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#b0a3ff" stopOpacity="0.9" />
-              <stop offset="50%" stopColor="#00e5ff" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#b0a3ff" stopOpacity="0" />
+              <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#6366F1" stopOpacity="0.7" />
+              <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.8" />
             </linearGradient>
           </defs>
 
@@ -436,7 +436,7 @@ export function CipherWheel({
               transform: `rotate(${gyroRotation}deg)`,
               transformOrigin: `${CENTER}px ${CENTER}px`,
             }}
-            opacity={0.22}
+            opacity={0.4}
           >
             {Array.from({ length: 52 }).map((_, i) => {
               const ang = i * (360 / 52);
@@ -449,15 +449,15 @@ export function CipherWheel({
                   y1={p1.y}
                   x2={p2.x}
                   y2={p2.y}
-                  stroke={i % 2 === 0 ? "rgba(176, 163, 255, 0.45)" : "rgba(0, 229, 255, 0.35)"}
-                  strokeWidth={i % 4 === 0 ? 1.5 : 0.8}
+                  stroke={i % 2 === 0 ? "rgba(105, 53, 211, 0.65)" : "rgba(2, 132, 199, 0.65)"}
+                  strokeWidth={i % 4 === 0 ? 1.6 : 1.0}
                 />
               );
             })}
           </g>
 
           {/* Fine Outer Perimeter Minute Ticks */}
-          <g opacity={0.18}>
+          <g opacity={0.32}>
             {Array.from({ length: 104 }).map((_, i) => {
               const ang = i * (360 / 104);
               const p1 = polarToCartesian(R_OUTER_ORBIT + 3, ang);
@@ -469,8 +469,8 @@ export function CipherWheel({
                   y1={p1.y}
                   x2={p2.x}
                   y2={p2.y}
-                  stroke="rgba(173, 166, 211, 0.4)"
-                  strokeWidth={i % 4 === 0 ? 1.2 : 0.6}
+                  stroke="rgba(89, 101, 121, 0.6)"
+                  strokeWidth={i % 4 === 0 ? 1.4 : 0.8}
                 />
               );
             })}
@@ -480,23 +480,23 @@ export function CipherWheel({
           {/* Top 12 o'clock Diamond */}
           <polygon
             points={`${CENTER},20 ${CENTER - 5},28 ${CENTER},36 ${CENTER + 5},28`}
-            fill="#b0a3ff"
-            opacity={0.8}
+            fill="#6935D3"
+            opacity={0.9}
           />
           {/* Right 3 o'clock Diamond */}
           <polygon
             points="480,250 472,245 464,250 472,255"
-            fill="rgba(176, 163, 255, 0.6)"
+            fill="rgba(105, 53, 211, 0.75)"
           />
           {/* Bottom 6 o'clock Diamond */}
           <polygon
             points={`${CENTER},480 ${CENTER - 5},472 ${CENTER},464 ${CENTER + 5},472`}
-            fill="rgba(176, 163, 255, 0.6)"
+            fill="rgba(105, 53, 211, 0.75)"
           />
           {/* Left 9 o'clock Diamond */}
           <polygon
             points="20,250 28,245 36,250 28,255"
-            fill="rgba(176, 163, 255, 0.6)"
+            fill="rgba(105, 53, 211, 0.75)"
           />
 
           {/* =============================================================== */}
