@@ -1310,9 +1310,15 @@ export function CommonAlgebraicStructure() {
 
         <div className={`comm-display ${commutes ? "commutes" : "not-commutes"}`}>
           <div className="comm-verdict">
-            {commutes
-              ? <span className="verdict yes">T₂ ∘ T₁ = T₁ ∘ T₂</span>
-              : <span className="verdict no">T₂ ∘ T₁ ≠ T₁ ∘ T₂</span>}
+            {commutes ? (
+              <span className="verdict yes">
+                <MathView math="T_2 \circ T_1 = T_1 \circ T_2" />
+              </span>
+            ) : (
+              <span className="verdict no">
+                <MathView math="T_2 \circ T_1 \neq T_1 \circ T_2" />
+              </span>
+            )}
           </div>
 
           {commSystem === "caesar" && (

@@ -20,6 +20,7 @@ import { GroupCipherCards } from "./components/GroupCipherCards";
 import { LabCalculations } from "./components/LabCalculations";
 import { CommonAlgebraicStructure } from "./components/CommonAlgebraicStructure";
 import { ExperimentsLab } from "./components/ExperimentsLab";
+import { MathView } from "./components/MathView";
 import "./App.css";
 
 type Page =
@@ -62,7 +63,7 @@ const systemMeta: Record<
     name: "Position permutations",
     symbol: "S₄",
     order: "24",
-    color: "silver",
+    color: "blue",
   },
 };
 
@@ -190,7 +191,6 @@ function App() {
       </main>
       <footer>
         <span>CRYPTOGRAPHY THROUGH ABSTRACT ALGEBRA</span>
-        <span>LAB / 2026</span>
         <span>REVERSIBILITY IS STRUCTURE</span>
       </footer>
     </div>
@@ -756,22 +756,41 @@ function Lab(props: {
           />
           <div className="calculation">
             <p className="eyebrow">ENGINE TRACE</p>
-            <code>
-              {system === "caesar"
-                ? (decrypt
-                    ? `D_${shift}(y) = (y - ${shift}) mod 26`
-                    : `E_${shift}(x) = (x + ${shift}) mod 26`)
-                : system === "affine"
-                  ? (decrypt
-                      ? `D_(${affine.a},${affine.b})(y) = ${affine.a}⁻¹(y - ${affine.b}) mod 26`
-                      : `E_(${affine.a},${affine.b})(x) = (${affine.a}x + ${affine.b}) mod 26`)
-                  : (decrypt
-                      ? `P⁻¹ = ${permutationLabel(permutationInverse(permutation))} · complete blocks of 4`
-                      : `P = ${permutationLabel(permutation)} · complete blocks of 4`)}
-            </code>
+            <div className="engine-trace-math">
+              {system === "caesar" && (
+                <MathView
+                  math={
+                    decrypt
+                      ? `D_{${shift}}(y) = (y - ${shift}) \\bmod 26`
+                      : `E_{${shift}}(x) = (x + ${shift}) \\bmod 26`
+                  }
+                  display
+                />
+              )}
+              {system === "affine" && (
+                <MathView
+                  math={
+                    decrypt
+                      ? `D_{(${affine.a},${affine.b})}(y) = ${affine.a}^{-1}(y - ${affine.b}) \\bmod 26`
+                      : `E_{(${affine.a},${affine.b})}(x) = (${affine.a}x + ${affine.b}) \\bmod 26`
+                  }
+                  display
+                />
+              )}
+              {system === "permutation" && (
+                <MathView
+                  math={
+                    decrypt
+                      ? `P^{-1} = \\text{${permutationLabel(permutationInverse(permutation))}} \\quad (\\text{blocks of 4})`
+                      : `P = \\text{${permutationLabel(permutation)}} \\quad (\\text{blocks of 4})`
+                  }
+                  display
+                />
+              )}
+            </div>
             <div className="verification">
               <span>INVERSE CHECK</span>
-              <strong>f⁻¹(f(x)) = x</strong>
+              <strong><MathView math="f^{-1}(f(x)) = x" /></strong>
               <b>✓ verified</b>
             </div>
           </div>
@@ -817,7 +836,17 @@ function Groups({
       <section className="metrics-row">
         {Object.entries(systemMeta).map(([key, meta]) => (
           <div key={key}>
-            <span>{meta.symbol}</span>
+            <span>
+              <MathView
+                math={
+                  meta.symbol === "C₂₆"
+                    ? "C_{26} \\cong \\mathbb{Z}_{26}"
+                    : meta.symbol === "AGL(1, 26)"
+                    ? "\\mathrm{AGL}(1, 26)"
+                    : "S_4 \\supset D_3"
+                }
+              />
+            </span>
             <strong>{meta.order}</strong>
             <small>elements / {meta.name}</small>
           </div>
@@ -831,67 +860,140 @@ function Groups({
           </div>
           <span className="noncommutative">NON-COMMUTATIVE</span>
         </div>
-        <div className="composition-selects">
-          <span>P = {permutationLabel(first)}</span>
-          <select
-            value={comparePermutation}
-            onChange={(event) =>
-              setComparePermutation(Number(event.target.value))
-            }
-          >
-            {S4.map((item, index) => (
-              <option value={index} key={item.join("")}>
-                Q = {permutationLabel(item)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="composition-results">
-          <div>
-            <small>P ∘ Q</small>
-            <strong>{permutationLabel(fg)}</strong>
-            <p>apply Q first, then P</p>
+        <div className="composition-toolbar">
+          <div className="comp-param-item">
+            <span className="comp-param-label">FIXED ELEMENT P:</span>
+            <div className="comp-param-val">
+              <MathView math={`P = [${first.map((x) => x + 1).join(",\\, ")}]`} />
+            </div>
           </div>
-          <div className="vs">≠</div>
-          <div>
-            <small>Q ∘ P</small>
-            <strong>{permutationLabel(gf)}</strong>
-            <p>apply P first, then Q</p>
+          <div className="comp-param-item">
+            <label htmlFor="perm-q-selector" className="comp-param-label">
+              COMPOSE WITH ELEMENT Q:
+            </label>
+            <select
+              id="perm-q-selector"
+              className="comp-param-select"
+              value={comparePermutation}
+              onChange={(event) =>
+                setComparePermutation(Number(event.target.value))
+              }
+              aria-label="Select permutation Q from symmetric group S4"
+            >
+              {S4.map((item, index) => (
+                <option value={index} key={item.join("")}>
+                  Q = {permutationLabel(item)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-        <div className="mapping-row">
-          <span>ABCD</span>
-          <i>→</i>
-          <b>{permutationText(fg, "ABCD")}</b>
-          <i>and</i>
-          <b>{permutationText(gf, "ABCD")}</b>
+
+        {/* Single Cohesive Mathematical Instrument Display */}
+        <div className="perm-composition-instrument">
+          <div className="perm-branch">
+            <span className="perm-branch-order">ORDER 1 / APPLY Q THEN P</span>
+            <div className="perm-formula-main">
+              <MathView
+                math={`(P \\circ Q) = [${fg.map((x) => x + 1).join(",\\, ")}]`}
+                display
+              />
+            </div>
+            <div className="perm-action-trace">
+              <span className="trace-input">ABCD</span>
+              <span className="trace-arrow">→</span>
+              <strong className="trace-output">{permutationText(fg, "ABCD")}</strong>
+            </div>
+          </div>
+
+          <div className="perm-vs-divider">
+            <span className="perm-vs-symbol">≠</span>
+            <span className="perm-vs-note">ORDER MATTERS</span>
+          </div>
+
+          <div className="perm-branch">
+            <span className="perm-branch-order">ORDER 2 / APPLY P THEN Q</span>
+            <div className="perm-formula-main">
+              <MathView
+                math={`(Q \\circ P) = [${gf.map((x) => x + 1).join(",\\, ")}]`}
+                display
+              />
+            </div>
+            <div className="perm-action-trace">
+              <span className="trace-input">ABCD</span>
+              <span className="trace-arrow">→</span>
+              <strong className="trace-output">{permutationText(gf, "ABCD")}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="composition-footer-note">
+          <p>
+            Because <MathView math="P \circ Q \neq Q \circ P" />, the symmetric group <MathView math="S_4" /> is non-abelian (non-commutative). Reversing the application sequence alters the output mapping.
+          </p>
         </div>
       </section>
+
       <section className="split-explorer">
-        <div className="panel inverse-card">
-          <p className="eyebrow">AFFINE INVERSE</p>
-          <h3>
-            E<sub>(5, 8)</sub>
-            <sup>−1</sup>
-          </h3>
-          <div className="inverse-equation">
-            <span>a⁻¹ = 21</span>
-            <span>b′ = −a⁻¹b mod 26 = −21 × 8 mod 26 = −168 mod 26 = 14</span>
+        {/* Left: Affine Inverse */}
+        <div className="panel affine-panel inverse-card">
+          <div className="affine-heading-block">
+            <p className="eyebrow">01 / ALGEBRAIC INVERSION</p>
+            <h2>Affine Inverse</h2>
+            <div className="affine-badge-row">
+              <span className="result-badge">REVERSIBLE</span>
+            </div>
           </div>
-          <strong className="inverse-result">
-            E<sub>(21, 14)</sub>
-          </strong>
-          <small>Verification: (5 × 21) mod 26 = 105 mod 26 = 1</small>
-        </div>
-        <div className="panel affine-compose">
-          <p className="eyebrow">AFFINE COMPOSITION</p>
-          <div className="affine-compose-row">
-            <span className="compose-prefix">
-              E<sub>(5, 8)</sub> ∘ E
+
+          <div className="affine-card-target">
+            <span className="affine-target-label">TARGET TRANSFORMATION:</span>
+            <div className="affine-target-math">
+              <MathView math="E_{(5, 8)}(x) \equiv (5x + 8) \pmod{26}" />
+            </div>
+          </div>
+
+          <div className="affine-derivation-well">
+            <span className="well-title">MODULAR DERIVATION</span>
+            <div className="derivation-step">
+              <span className="step-label">1. Multiplier Inverse:</span>
+              <MathView math="a^{-1} \equiv 5^{-1} \equiv 21 \pmod{26} \quad (5 \times 21 = 105 \equiv 1)" />
+            </div>
+            <div className="derivation-step">
+              <span className="step-label">2. Translation Parameter:</span>
+              <MathView math="b' \equiv -a^{-1}b \equiv -21 \times 8 = -168 \equiv 14 \pmod{26}" />
+            </div>
+          </div>
+
+          <div className="affine-result-card">
+            <span className="result-card-label">INVERSE TRANSFORMATION</span>
+            <div className="result-card-math">
+              <MathView math="E_{(5, 8)}^{-1} = E_{(21, 14)}" display />
+            </div>
+          </div>
+
+          <div className="affine-verification-bar">
+            <span className="verif-check">✓</span>
+            <span>
+              <MathView math="\text{Verification: } E_{(21, 14)}(E_{(5, 8)}(x)) \equiv x \pmod{26}" />
             </span>
-            <div className="compose-inputs">
-              <label className="compose-input-label">
-                <span>a₂</span>
+          </div>
+        </div>
+
+        {/* Right: Affine Composition */}
+        <div className="panel affine-panel compose-card">
+          <div className="affine-heading-block">
+            <p className="eyebrow">02 / FUNCTION COMPOSITION</p>
+            <h2>Affine Composition</h2>
+            <div className="affine-badge-row">
+              <span className="noncommutative">NON-COMMUTATIVE</span>
+            </div>
+          </div>
+
+          <div className="affine-card-target">
+            <span className="affine-target-label">COMPOSE WITH:</span>
+            <div className="compose-inputs-row">
+              <label className="compose-field">
+                <span className="field-name">Multiplier a₂:</span>
                 <select
                   value={compareAffine.a}
                   onChange={(event) =>
@@ -909,8 +1011,8 @@ function Groups({
                   ))}
                 </select>
               </label>
-              <label className="compose-input-label">
-                <span>b₂</span>
+              <label className="compose-field">
+                <span className="field-name">Shift b₂:</span>
                 <input
                   type="number"
                   min="0"
@@ -927,15 +1029,39 @@ function Groups({
               </label>
             </div>
           </div>
-          <strong className="compose-result">
-            E
-            <sub>
-              ({affineResult.a}, {affineResult.b})
-            </sub>
-          </strong>
-          <small className="compose-formula-note">
-            ((5 × {compareAffine.a}) mod 26, (5 × {compareAffine.b} + 8) mod 26) = ({affineResult.a}, {affineResult.b})
-          </small>
+
+          <div className="affine-derivation-well">
+            <span className="well-title">COMPOSITION LAW</span>
+            <div className="derivation-step">
+              <span className="step-label">1. Composed Multiplier:</span>
+              <MathView
+                math={`a_{\\text{comp}} = (5 \\times ${compareAffine.a}) \\bmod 26 = ${affineResult.a}`}
+              />
+            </div>
+            <div className="derivation-step">
+              <span className="step-label">2. Composed Shift:</span>
+              <MathView
+                math={`b_{\\text{comp}} = (5 \\times ${compareAffine.b} + 8) \\bmod 26 = ${affineResult.b}`}
+              />
+            </div>
+          </div>
+
+          <div className="affine-result-card">
+            <span className="result-card-label">COMPOSED TRANSFORMATION</span>
+            <div className="result-card-math">
+              <MathView
+                math={`E_{(5, 8)} \\circ E_{(${compareAffine.a},\\, ${compareAffine.b})} = E_{(${affineResult.a},\\, ${affineResult.b})}`}
+                display
+              />
+            </div>
+          </div>
+
+          <div className="affine-verification-bar">
+            <span className="verif-check">◈</span>
+            <span>
+              <MathView math="E_{(a_1, b_1)} \circ E_{(a_2, b_2)}(x) \equiv a_1(a_2 x + b_2) + b_1 \pmod{26}" />
+            </span>
+          </div>
         </div>
       </section>
     </div>
@@ -1104,22 +1230,25 @@ function Team() {
           <p className="team-cta-description">
             Explore the implementation, inspect the mathematical experiments, and follow the development of Abstract Algebra Lab on GitHub.
           </p>
-          <a
-            href="https://github.com/PVSSP656/final-algebra-lab"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="team-cta-button"
-          >
-            View Project on GitHub <span>↗</span>
-          </a>
-          <a
-            href="/documents/research-paper.pdf"
-            download="Abstract-Algebra-Lab-Research-Paper.pdf"
-            className="team-cta-button team-download-button"
-          >
-            <Download size={14} strokeWidth={2.5} aria-hidden="true" />
-            Download Research Paper (PDF)
-          </a>
+          <div className="team-cta-actions">
+            <a
+              href="https://github.com/PVSSP656/final-algebra-lab"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="team-cta-button team-github-button"
+            >
+              <span>View Project on GitHub</span>
+              <span className="cta-icon">↗</span>
+            </a>
+            <a
+              href="/documents/research-paper.pdf"
+              download="Abstract-Algebra-Lab-Research-Paper.pdf"
+              className="team-cta-button team-download-button"
+            >
+              <Download size={15} strokeWidth={2.2} aria-hidden="true" />
+              <span>Download Research Paper (PDF)</span>
+            </a>
+          </div>
         </div>
       </section>
     </div>

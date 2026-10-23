@@ -1390,12 +1390,12 @@ export function ExperimentsLab() {
                 {ALPHABET.slice(0, 5).split("").map((letter) => {
                   const count = (bruteCipher.toUpperCase().match(new RegExp(letter, "g")) || []).length;
                   return (
-                    <div key={letter}>
+                    <div key={letter} className="freq-signature-row">
                       <b>{letter}</b>
-                      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", height: 5 }}>
-                        <i style={{ width: `${Math.min(count * 20, 100)}%`, height: "100%", background: "var(--lav)", display: "block" }} />
+                      <div className="bar-track-mini" title={`Count for ${letter}: ${count}`}>
+                        <i style={{ width: `${Math.min(count * 20, 100)}%` }} />
                       </div>
-                      <span>{count}</span>
+                      <span className="freq-count-badge">{count}</span>
                     </div>
                   );
                 })}
