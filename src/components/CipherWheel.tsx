@@ -11,6 +11,7 @@ type CipherWheelProps = {
   affine?: { a: number; b: number };
   permKey?: number[] | [number, number, number, number];
   permutation?: number[] | [number, number, number, number];
+  resetKey?: number;
 };
 
 const CENTER = 250;
@@ -48,6 +49,7 @@ export function CipherWheel({
   affine,
   permKey,
   permutation,
+  resetKey,
 }: CipherWheelProps) {
   // Guaranteed valid Affine parameters (default to valid a=5, b=8 if not provided)
   const effectiveAffine = useMemo(() => {
@@ -107,6 +109,47 @@ export function CipherWheel({
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  // Smooth canonical reset for both rings simultaneously
+  const resetToCanonical = useCallback((reduced: boolean) => {
+    pendingRef.current.forEach(clearTimeout);
+    pendingRef.current = [];
+
+    const newOuter = shortestPath(outerDegRef.current, 0);
+    const newInner = shortestPath(innerDegRef.current, 0);
+
+    outerDegRef.current = newOuter;
+    innerDegRef.current = newInner;
+
+    setOuterTransition(
+      reduced ? "none" : "transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)"
+    );
+    setInnerTransition(
+      reduced ? "none" : "transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)"
+    );
+
+    setOuterDeg(newOuter);
+    setInnerDeg(newInner);
+
+    // After animation finishes, cleanly normalize refs and state to exact 0
+    const normalizeTimer = setTimeout(() => {
+      outerDegRef.current = 0;
+      innerDegRef.current = 0;
+      setOuterTransition("none");
+      setInnerTransition("none");
+      setOuterDeg(0);
+      setInnerDeg(0);
+    }, reduced ? 0 : 550);
+    pendingRef.current.push(normalizeTimer);
+  }, []);
+
+  // Reset wheel state when resetKey increments
+  useEffect(() => {
+    if (resetKey === undefined || resetKey === 0) return;
+    setHoveredLetter(null);
+    setHoveredCardIndex(null);
+    resetToCanonical(prefersReducedMotion);
+  }, [resetKey, prefersReducedMotion, resetToCanonical]);
 
   // Core animation function: smoothly rotate outer ring then inner ring
   const animateToLetters = useCallback(
@@ -259,20 +302,26 @@ export function CipherWheel({
   }
 
   // Determine active highlighted letters
-  const activePlainChar = hoveredLetter
-    ? hoveredLetter
-    : hoveredCardIndex != null && mappingCards[hoveredCardIndex]
-    ? mappingCards[hoveredCardIndex].plain
-    : topOuterChar;
+  const hasActiveInput = plaintext.trim().length > 0;
 
-  const activeCipherChar = hoveredLetter
-    ? (mappingCards.find((c) => c.plain === hoveredLetter)?.cipher ??
-       (system === "affine" && effectiveAffine
-         ? ALPHABET[(effectiveAffine.a * ALPHABET.indexOf(hoveredLetter) + effectiveAffine.b) % 26]!
-         : ALPHABET[(ALPHABET.indexOf(hoveredLetter) + shift) % 26]!))
-    : hoveredCardIndex != null && mappingCards[hoveredCardIndex]
-    ? mappingCards[hoveredCardIndex].cipher
-    : topInnerChar;
+  const activePlainChar = hasActiveInput
+    ? (hoveredLetter
+        ? hoveredLetter
+        : hoveredCardIndex != null && mappingCards[hoveredCardIndex]
+        ? mappingCards[hoveredCardIndex].plain
+        : topOuterChar)
+    : null;
+
+  const activeCipherChar = hasActiveInput
+    ? (hoveredLetter
+        ? (mappingCards.find((c) => c.plain === hoveredLetter)?.cipher ??
+           (system === "affine" && effectiveAffine
+             ? ALPHABET[(effectiveAffine.a * ALPHABET.indexOf(hoveredLetter) + effectiveAffine.b) % 26]!
+             : ALPHABET[(ALPHABET.indexOf(hoveredLetter) + shift) % 26]!))
+        : hoveredCardIndex != null && mappingCards[hoveredCardIndex]
+        ? mappingCards[hoveredCardIndex].cipher
+        : topInnerChar)
+    : null;
 
   return (
     <div
@@ -387,7 +436,7 @@ export function CipherWheel({
               transform: `rotate(${gyroRotation}deg)`,
               transformOrigin: `${CENTER}px ${CENTER}px`,
             }}
-            opacity={0.45}
+            opacity={0.22}
           >
             {Array.from({ length: 52 }).map((_, i) => {
               const ang = i * (360 / 52);
@@ -408,7 +457,7 @@ export function CipherWheel({
           </g>
 
           {/* Fine Outer Perimeter Minute Ticks */}
-          <g opacity={0.35}>
+          <g opacity={0.18}>
             {Array.from({ length: 104 }).map((_, i) => {
               const ang = i * (360 / 104);
               const p1 = polarToCartesian(R_OUTER_ORBIT + 3, ang);
@@ -432,7 +481,7 @@ export function CipherWheel({
           <polygon
             points={`${CENTER},20 ${CENTER - 5},28 ${CENTER},36 ${CENTER + 5},28`}
             fill="#b0a3ff"
-            filter="url(#violetGlow)"
+            opacity={0.8}
           />
           {/* Right 3 o'clock Diamond */}
           <polygon
@@ -464,7 +513,7 @@ export function CipherWheel({
             {ALPHABET.split("").map((letter, i) => {
               const angDeg = i * DEG_STEP;
               const { x, y } = polarToCartesian(R_OUTER_LETTERS, angDeg);
-              const isSelected = letter === activePlainChar;
+              const isSelected = letter === activePlainChar && activePlainChar !== null;
 
               return (
                 <g
@@ -516,7 +565,7 @@ export function CipherWheel({
             {ALPHABET.split("").map((letter, i) => {
               const angDeg = i * DEG_STEP;
               const { x, y } = polarToCartesian(R_INNER_LETTERS, angDeg);
-              const isSelected = letter === activeCipherChar;
+              const isSelected = letter === activeCipherChar && activeCipherChar !== null;
 
               return (
                 <g
@@ -560,37 +609,39 @@ export function CipherWheel({
           {/* =============================================================== */}
           {/* 3. FIXED SELECTION MARKERS (12 O'CLOCK POSITION)                */}
           {/* =============================================================== */}
-          <g className="fixed-selection-markers" pointerEvents="none">
-            {/* Vertical Radial Alignment Line connecting 12 o'clock outer to core */}
-            <line
-              x1={CENTER}
-              y1="40"
-              x2={CENTER}
-              y2={CENTER - R_CORE - 4}
-              stroke="url(#radialGuideGrad)"
-              strokeWidth="1.5"
-              strokeDasharray="2 2"
-              opacity={0.8}
-            />
+          {hasActiveInput && (
+            <g className="fixed-selection-markers" pointerEvents="none">
+              {/* Vertical Radial Alignment Line connecting 12 o'clock outer to core */}
+              <line
+                x1={CENTER}
+                y1="40"
+                x2={CENTER}
+                y2={CENTER - R_CORE - 4}
+                stroke="url(#radialGuideGrad)"
+                strokeWidth="1.2"
+                strokeDasharray="2 2"
+                opacity={0.6}
+              />
 
-            {/* Outer Letter Luminous Circle at 12 o'clock */}
-            <circle
-              cx={CENTER}
-              cy={CENTER - R_OUTER_LETTERS}
-              r="17"
-              className="fixed-marker-circle outer-marker"
-              filter="url(#violetGlow)"
-            />
+              {/* Outer Letter Luminous Circle at 12 o'clock */}
+              <circle
+                cx={CENTER}
+                cy={CENTER - R_OUTER_LETTERS}
+                r="17"
+                className="fixed-marker-circle outer-marker"
+                filter="url(#violetGlow)"
+              />
 
-            {/* Inner Letter Luminous Circle at 12 o'clock */}
-            <circle
-              cx={CENTER}
-              cy={CENTER - R_INNER_LETTERS}
-              r="15"
-              className="fixed-marker-circle inner-marker"
-              filter="url(#cyanGlow)"
-            />
-          </g>
+              {/* Inner Letter Luminous Circle at 12 o'clock */}
+              <circle
+                cx={CENTER}
+                cy={CENTER - R_INNER_LETTERS}
+                r="15"
+                className="fixed-marker-circle inner-marker"
+                filter="url(#cyanGlow)"
+              />
+            </g>
+          )}
 
           {/* =============================================================== */}
           {/* 4. CENTRAL CORE — System-aware display                          */}
@@ -724,9 +775,10 @@ export function CipherWheel({
       <div className="wheel-mapping-cards-tray" role="region" aria-label="Letter-by-letter transformation stream">
         {mappingCards.map((card, i) => {
           const isCardActive =
-            hoveredCardIndex === i ||
-            (hoveredLetter === card.plain && hoveredCardIndex === null) ||
-            (hoveredLetter === null && hoveredCardIndex === null && i === 0);
+            hasActiveInput && (
+              hoveredCardIndex === i ||
+              (hoveredLetter === card.plain && hoveredCardIndex === null)
+            );
 
           return (
             <div key={`card-${card.plain}-${i}`} className="mapping-card-item-wrap">

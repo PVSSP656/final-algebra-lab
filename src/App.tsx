@@ -77,6 +77,7 @@ function App() {
   const [comparePermutation, setComparePermutation] = useState(6);
   const [compareAffine, setCompareAffine] = useState<AffineKey>({ a: 3, b: 4 });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const permutation = S4[permutationIndex];
   const output = useMemo(() => {
     if (!message || message.trim().length === 0) {
@@ -168,6 +169,8 @@ function App() {
                 decrypt={decrypt}
                 setDecrypt={setDecrypt}
                 output={output}
+                resetKey={resetKey}
+                setResetKey={setResetKey}
               />
             )}
             {page === "groups" && (
@@ -457,6 +460,8 @@ function Lab(props: {
   decrypt: boolean;
   setDecrypt: (v: boolean) => void;
   output: string;
+  resetKey: number;
+  setResetKey: React.Dispatch<React.SetStateAction<number>>;
 }) {
   const {
     system,
@@ -473,6 +478,8 @@ function Lab(props: {
     decrypt,
     setDecrypt,
     output,
+    resetKey,
+    setResetKey,
   } = props;
   const keyLabel =
     system === "caesar"
@@ -521,14 +528,23 @@ function Lab(props: {
             <span>TRANSFORMATION</span>
             <span>LIVE</span>
           </div>
-          <div className="segmented">
+          <div className="seg-control" role="tablist" aria-label="Transformation system">
+            <div
+              className="seg-indicator"
+              style={{
+                transform: `translateX(${((["caesar", "affine", "permutation"] as System[]).indexOf(system)) * 100}%)`,
+              }}
+              aria-hidden="true"
+            />
             {(["caesar", "affine", "permutation"] as System[]).map((item) => (
               <button
                 key={item}
-                className={system === item ? "selected" : ""}
+                role="tab"
+                aria-selected={system === item}
+                className={`seg-btn${system === item ? " seg-active" : ""}`}
                 onClick={() => setSystem(item)}
               >
-                {systemMeta[item].symbol}
+                <span className="seg-symbol">{systemMeta[item].symbol}</span>
               </button>
             ))}
           </div>
@@ -668,13 +684,15 @@ function Lab(props: {
             </button>
           </div>
           <button
+            type="button"
             className="reset-button"
             onClick={() => {
-              setMessage("HELLO, ALGEBRA!");
-              setShift(3);
+              setMessage("");
+              setShift(0);
               setAffine({ a: 5, b: 8 });
               setPermutationIndex(13);
               setDecrypt(false);
+              setResetKey((k) => k + 1);
             }}
           >
             Reset experiment
@@ -693,14 +711,14 @@ function Lab(props: {
             </div>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={output}
-                className="output-message"
+                key={output || "empty"}
+                className={`output-message ${!output ? "empty-state" : ""}`}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.18, ease: "easeOut" }}
               >
-                {output || "TYPE A MESSAGE"}
+                {output || "Awaiting message input..."}
               </motion.div>
             </AnimatePresence>
             <div className="operation-path">
@@ -725,6 +743,7 @@ function Lab(props: {
             system={system}
             affineKey={affine}
             permKey={permutation}
+            resetKey={resetKey}
           />
           <LabCalculations
             system={system}
